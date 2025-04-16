@@ -11,9 +11,9 @@ importers:
       n8n-workflow:
         specifier: ^1.82.0
         version: 1.82.0
-      truelime-zerox:
-        specifier: file:zerox-truelime-1.1.17.tgz
-        version: zerox-truelime@file:zerox-truelime-1.1.17.tgz(typescript@5.8.3)(zod@3.24.1)
+      truelime-docs-processor:
+        specifier: file:truelime-docs-processor-1.1.17.tgz
+        version: file:truelime-docs-processor-1.1.17.tgz(typescript@5.8.3)(zod@3.24.1)
     devDependencies:
       '@typescript-eslint/parser':
         specifier: ^8.30.1
@@ -1958,6 +1958,10 @@ packages:
     engines: {node: '>=6.0.0'}
     hasBin: true
 
+  truelime-docs-processor@file:truelime-docs-processor-1.1.17.tgz:
+    resolution: {integrity: sha512-CGZV/etjxmSkWJzzPF3mpTY6afiNoOi+PtihJ1mafxKH6S/Io7UV/hJcsFFqupsdL9+3RXe4pTidby+rpXSxEA==, tarball: file:truelime-docs-processor-1.1.17.tgz}
+    version: 1.1.17
+
   ts-api-utils@1.3.0:
     resolution: {integrity: sha512-UQMIo7pb8WRomKR1/+MFVLTroIvDVtMX3K6OUir8ynLyzB8Jeriont2bTAtmNPa1ekAgN7YPDyf6V+ygrdU+eQ==}
     engines: {node: '>=16'}
@@ -2136,10 +2140,6 @@ packages:
   yocto-queue@0.1.0:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
-
-  zerox-truelime@file:zerox-truelime-1.1.17.tgz:
-    resolution: {integrity: sha512-NDOLgaRvwnUIU9vocVB8bqwfXVl8r8wOdIFAHwi9dtXi89sUXO24aiVuAf1m+bICqbeLwenisCIgUDnHomap7A==, tarball: file:zerox-truelime-1.1.17.tgz}
-    version: 1.1.17
 
   zlibjs@0.3.1:
     resolution: {integrity: sha512-+J9RrgTKOmlxFSDHo0pI1xM6BLVUv+o0ZT9ANtCxGkjIVCCUdx9alUF8Gm+dGLKbkkkidWIHFDZHDMpfITt4+w==}
@@ -4508,6 +4508,38 @@ snapshots:
     dependencies:
       yargs: 17.7.2
 
+  truelime-docs-processor@file:truelime-docs-processor-1.1.17.tgz(typescript@5.8.3)(zod@3.24.1):
+    dependencies:
+      os: 0.1.2
+      '@aws-sdk/client-bedrock-runtime': 3.787.0
+      '@google/generative-ai': 0.21.0
+      '@t3-oss/env-core': 0.12.0(typescript@5.8.3)(zod@3.24.1)
+      axios: 1.8.4
+      child_process: 1.0.2
+      file-type: 16.5.4
+      fs-extra: 11.3.0
+      heic-convert: 2.1.0
+      libreoffice-convert: 1.6.1
+      mime-types: 2.1.35
+      openai: 4.94.0(zod@3.24.1)
+      p-limit: 3.1.0
+      path: 0.12.7
+      pdf-parse: 1.1.1
+      pdf2pic: 3.1.4
+      sharp: 0.33.5
+      tesseract.js: 5.1.1
+      uuid: 11.1.0
+      xlsx: 0.18.5
+    transitivePeerDependencies:
+      - aws-crt
+      - debug
+      - encoding
+      - supports-color
+      - typescript
+      - valibot
+      - ws
+      - zod
+
   ts-api-utils@1.3.0(typescript@5.8.3):
     dependencies:
       typescript: 5.8.3
@@ -4708,38 +4740,6 @@ snapshots:
       yargs-parser: 21.1.1
 
   yocto-queue@0.1.0: {}
-
-  zerox-truelime@file:zerox-truelime-1.1.17.tgz(typescript@5.8.3)(zod@3.24.1):
-    dependencies:
-      os: 0.1.2
-      '@aws-sdk/client-bedrock-runtime': 3.787.0
-      '@google/generative-ai': 0.21.0
-      '@t3-oss/env-core': 0.12.0(typescript@5.8.3)(zod@3.24.1)
-      axios: 1.8.4
-      child_process: 1.0.2
-      file-type: 16.5.4
-      fs-extra: 11.3.0
-      heic-convert: 2.1.0
-      libreoffice-convert: 1.6.1
-      mime-types: 2.1.35
-      openai: 4.94.0(zod@3.24.1)
-      p-limit: 3.1.0
-      path: 0.12.7
-      pdf-parse: 1.1.1
-      pdf2pic: 3.1.4
-      sharp: 0.33.5
-      tesseract.js: 5.1.1
-      uuid: 11.1.0
-      xlsx: 0.18.5
-    transitivePeerDependencies:
-      - aws-crt
-      - debug
-      - encoding
-      - supports-color
-      - typescript
-      - valibot
-      - ws
-      - zod
 
   zlibjs@0.3.1: {}
 

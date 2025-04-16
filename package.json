@@ -55,7 +55,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "truelime-zerox": "file:zerox-truelime-1.1.17.tgz"
+    "truelime-docs-processor": "file:truelime-docs-processor-1.1.17.tgz"
   },
   "peerDependencies": {
     "n8n-workflow": "^1.82.0"
