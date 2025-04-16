@@ -11,9 +11,9 @@ RUN npm install langfuse --loglevel verbose
 
 # Install the custom nodes
 RUN mkdir /home/node/.n8n/nodes
-COPY n8n-nodes-truelime-docs-1.0.0.tgz /home/node/.n8n/nodes/n8n-nodes-truelime-docs-1.0.0.tgz
-COPY truelime-docs-processor-1.1.17.tgz /home/node/.n8n/nodes/truelime-docs-processor-1.1.17.tgz
-RUN cd /home/node/.n8n/nodes/ && npm install ./n8n-nodes-truelime-docs-1.0.0.tgz --loglevel verbose && chown -R node:node /home/node/.n8n/nodes && rm -rf /home/node/.n8n/nodes/*.tgz
+COPY n8n-nodes-limescape-docs-1.0.0.tgz /home/node/.n8n/nodes/n8n-nodes-limescape-docs-1.0.0.tgz
+COPY limescape-docs-processor-1.1.17.tgz /home/node/.n8n/nodes/limescape-docs-processor-1.1.17.tgz
+RUN cd /home/node/.n8n/nodes/ && npm install ./n8n-nodes-limescape-docs-1.0.0.tgz --loglevel verbose && chown -R node:node /home/node/.n8n/nodes && rm -rf /home/node/.n8n/nodes/*.tgz
 
 # Switch back to the node homedir and user
 WORKDIR /home/node

@@ -1,5 +1,5 @@
 {
-  "name": "n8n-nodes-truelime-docs",
+  "name": "n8n-nodes-limescape-docs",
   "version": "1.0.0",
   "description": "N8N node for Zerox OCR & Document Extraction",
   "keywords": [
@@ -8,15 +8,15 @@
     "multi-modal",
     "document",
     "document-processing",
-    "truelime",
-    "truelime-docs",
-    "truelime-docs-processor",
+    "limescape",
+    "limescape-docs",
+    "limescape-docs-processor",
     "ocr",
     "document-extraction",
     "vision-models"
   ],
   "license": "MIT",
-  "homepage": "https://truelime.nl",
+  "homepage": "https://limescape.ai",
   "author": {
     "name": "Rodger Blom",
     "email": "rodger.blom@truelime.nl"
@@ -46,10 +46,10 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/TruelimeDocsApi.credentials.js"
+      "dist/credentials/LimescapeDocsApi.credentials.js"
     ],
     "nodes": [
-      "dist/nodes/TruelimeDocs/TruelimeDocs.node.js"
+      "dist/nodes/LimescapeDocs/LimescapeDocs.node.js"
     ]
   },
   "devDependencies": {
@@ -61,7 +61,7 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "truelime-docs-processor": "file:truelime-docs-processor-1.1.17.tgz"
+    "limescape-docs-processor": "file:limescape-docs-processor-1.1.17.tgz"
   },
   "peerDependencies": {
     "n8n-workflow": "^1.82.0"

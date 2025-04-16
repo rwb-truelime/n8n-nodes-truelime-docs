@@ -8,7 +8,7 @@ import {
 	NodeConnectionType,
   IBinaryData,
 } from 'n8n-workflow';
-import { zerox, ZeroxArgs, ModelCredentials, ErrorMode as ZeroxErrorMode, ModelProvider as ZeroxModelProvider } from 'truelime-docs-processor';
+import { zerox, ZeroxArgs, ModelCredentials, ErrorMode as ZeroxErrorMode, ModelProvider as ZeroxModelProvider } from 'limescape-docs-processor';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -36,17 +36,17 @@ const parsePages = (pagesStr: string | undefined): number[] | number | undefined
 };
 
 
-export class TruelimeDocs implements INodeType {
+export class LimescapeDocs implements INodeType {
   description: INodeTypeDescription = {
-      displayName: 'Truelime Docs',
-      name: 'truelimeDocs',
-      icon: 'file:truelime-logo-n8n-plain.svg',
+      displayName: 'Limescape Docs',
+      name: 'limescapeDocs',
+      icon: 'file:limescape-logo-square.svg',
       group: ['transform'],
       version: 1,
       subtitle: '={{$parameter["operation"]}}',
-      description: 'OCR & Document Extraction using vision models via Truelime Docs processing',
+      description: 'OCR & Document Extraction using vision models via Limescape Docs processing',
       defaults: {
-          name: 'Truelime Docs',
+          name: 'Limescape Docs',
       },
       // eslint-disable-next-line n8n-nodes-base/node-class-description-inputs-wrong-regular-node
       inputs: [
@@ -61,7 +61,7 @@ export class TruelimeDocs implements INodeType {
       outputs: [ { type: NodeConnectionType.Main } ],
       credentials: [
           {
-              name: 'truelimeDocsApi',
+              name: 'limescapeDocsApi',
               required: true,
           }
       ],
@@ -100,10 +100,12 @@ export class TruelimeDocs implements INodeType {
                   { name: 'Claude 3.5 Sonnet (Bedrock)', value: 'anthropic.claude-3-5-sonnet-20240620-v1:0' },
                   { name: 'Gemini 1.5 Flash (Google)', value: 'gemini-1.5-flash-latest' },
                   { name: 'Gemini 1.5 Pro (Google)', value: 'gemini-1.5-pro-latest' },
+                  { name: 'GPT-4.1 (OpenAI/Azure)', value: 'gpt-4.1' },
+                  { name: 'GPT-4.1 Mini (OpenAI/Azure)', value: 'gpt-4.1-mini' },
                   { name: 'GPT-4o (OpenAI/Azure)', value: 'gpt-4o' },
                   { name: 'GPT-4o Mini (OpenAI/Azure)', value: 'gpt-4o-mini' },
               ],
-              default: 'gpt-4o', // Add default value
+              default: 'gpt-4.1', // Set GPT-4.1 as default
               description: 'The specific model identifier for the selected provider',
           },
           {
@@ -127,19 +129,6 @@ export class TruelimeDocs implements INodeType {
           },
 
           // --- Behavior ---
-           // eslint-disable-next-line n8n-nodes-base/node-param-default-missing
-           {
-              displayName: 'Error Mode',
-              name: 'errorMode',
-              type: 'options',
-              options: [
-                  { name: 'Throw Error (Fail Node)', value: ZeroxErrorMode.THROW }, // Use Enum values
-                  { name: 'Ignore Error (Output Empty)', value: ZeroxErrorMode.IGNORE },
-              ],
-              default: ZeroxErrorMode.THROW, // Default is correctly set using Enum
-              description: 'How the underlying zerox library should handle processing errors',
-          },
-
            {
               displayName: 'Input Binary Field',
               name: 'binaryPropertyName',
@@ -266,7 +255,6 @@ export class TruelimeDocs implements INodeType {
       const globalModelProvider = this.getNodeParameter('modelProvider', 0) as ZeroxModelProvider;
       const globalModel = this.getNodeParameter('model', 0) as string;
       const globalCustomModel = this.getNodeParameter('customModel', 0, '') as string;
-      const globalErrorMode = this.getNodeParameter('errorMode', 0) as ZeroxErrorMode;
       const globalSchemaRaw = this.getNodeParameter('schema', 0, '') as string | object;
       const globalProcessingOptions = this.getNodeParameter('processingOptions', 0, {}) as IDataObject;
       const globalExtractionOptions = this.getNodeParameter('extractionOptions', 0, {}) as IDataObject;
@@ -274,26 +262,39 @@ export class TruelimeDocs implements INodeType {
       const globalExtractionLlmParameters = this.getNodeParameter('extractionLlmParameters', 0, {}) as IDataObject;
 
       // --- Get Credentials ---
-      const credentials = await this.getCredentials('TruelimeDocsApi') as IDataObject;
+      const credentials = await this.getCredentials('limescapeDocsApi') as IDataObject;
 
       // --- Prepare Base Credentials (using IDataObject for flexibility) ---
       const baseModelCredentials: IDataObject = {};
       let baseExtractionCredentials: IDataObject | undefined = undefined; // Initialize as undefined
 
       // Corrected mapCredentials function using IDataObject
+      /**
+       * Maps credentials for the selected provider only.
+       * Throws a clear error if required credentials for the selected provider are missing.
+       * Ignores credentials for other providers, even if present.
+       */
       const mapCredentials = (provider: ZeroxModelProvider, targetCreds: IDataObject) => {
           if (provider === ZeroxModelProvider.OPENAI) {
-              if (!credentials.openaiApiKey) throw new NodeOperationError(this.getNode(), 'OpenAI API Key missing in credentials.', { itemIndex: -1 });
+              if (!credentials.openaiApiKey) {
+                  throw new NodeOperationError(this.getNode(), 'OpenAI API Key is required when using OpenAI as the provider.', { itemIndex: -1 });
+              }
               targetCreds.apiKey = credentials.openaiApiKey as string;
           } else if (provider === ZeroxModelProvider.AZURE) {
-               if (!credentials.azureApiKey || !credentials.azureEndpoint) throw new NodeOperationError(this.getNode(), 'Azure API Key or Endpoint missing in credentials.', { itemIndex: -1 });
+              if (!credentials.azureApiKey || !credentials.azureEndpoint) {
+                  throw new NodeOperationError(this.getNode(), 'Azure API Key and Azure Endpoint are required when using Azure as the provider.', { itemIndex: -1 });
+              }
               targetCreds.apiKey = credentials.azureApiKey as string;
               targetCreds.endpoint = credentials.azureEndpoint as string;
           } else if (provider === ZeroxModelProvider.GOOGLE) {
-               if (!credentials.googleApiKey) throw new NodeOperationError(this.getNode(), 'Google API Key missing in credentials.', { itemIndex: -1 });
+              if (!credentials.googleApiKey) {
+                  throw new NodeOperationError(this.getNode(), 'Google API Key is required when using Google as the provider.', { itemIndex: -1 });
+              }
               targetCreds.apiKey = credentials.googleApiKey as string;
           } else if (provider === ZeroxModelProvider.BEDROCK) {
-               if (!credentials.bedrockAccessKeyId || !credentials.bedrockSecretAccessKey || !credentials.bedrockRegion) throw new NodeOperationError(this.getNode(), 'AWS Bedrock Access Key ID, Secret Key, or Region missing in credentials.', { itemIndex: -1 });
+              if (!credentials.bedrockAccessKeyId || !credentials.bedrockSecretAccessKey || !credentials.bedrockRegion) {
+                  throw new NodeOperationError(this.getNode(), 'AWS Bedrock Access Key ID, Secret Key, and Region are required when using AWS Bedrock as the provider.', { itemIndex: -1 });
+              }
               targetCreds.accessKeyId = credentials.bedrockAccessKeyId as string;
               targetCreds.secretAccessKey = credentials.bedrockSecretAccessKey as string;
               targetCreds.region = credentials.bedrockRegion as string;
@@ -301,7 +302,7 @@ export class TruelimeDocs implements INodeType {
                   targetCreds.sessionToken = credentials.bedrockSessionToken as string;
               }
           } else {
-               throw new NodeOperationError(this.getNode(), `Unsupported provider type in mapCredentials: ${provider}`, { itemIndex: -1 });
+              throw new NodeOperationError(this.getNode(), `Unsupported provider type in mapCredentials: ${provider}`, { itemIndex: -1 });
           }
       };
 
@@ -367,7 +368,6 @@ export class TruelimeDocs implements INodeType {
                   credentials: baseModelCredentials as unknown as ModelCredentials,
                   model: globalCustomModel || globalModel,
                   modelProvider: globalModelProvider,
-                  errorMode: globalErrorMode,
               };
 
               // Add optional parameters carefully
@@ -412,7 +412,7 @@ export class TruelimeDocs implements INodeType {
 
 
               // --- 4. Call Zerox ---
-              const result = await zerox(zeroxArgs);
+              const result = await zerox({ ...zeroxArgs, errorMode: ZeroxErrorMode.THROW });
 
               // --- 5. Aggregate Successful Results ---
                if (aggregatedResults.markdown.length > 0) { aggregatedResults.markdown += "\n\n---\n\n"; }
@@ -439,13 +439,14 @@ export class TruelimeDocs implements INodeType {
               processedFileCount++;
 
           } catch (error) {
+              // --- N8N error output handling ---
               const errorMessage = error instanceof Error ? error.message : String(error);
-
-              if (error instanceof NodeOperationError) {
-                  throw error;
-              } else {
-                  throw new NodeOperationError(this.getNode(), `Error processing item ${i} (${currentFilename || 'unknown'}): ${errorMessage}`, { itemIndex: i });
-              }
+              successData.push({
+                  json: { message: errorMessage, itemIndex: i, file: currentFilename },
+                  error: new NodeOperationError(this.getNode(), errorMessage, { itemIndex: i }),
+                  itemIndex: i,
+              });
+              continue; // Continue to next item
           } finally {
               // --- 6. Cleanup Temporary File ---
               if (tempFilePath && fs.existsSync(tempFilePath)) {
