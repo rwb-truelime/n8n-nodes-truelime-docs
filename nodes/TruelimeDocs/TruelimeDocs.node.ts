@@ -40,7 +40,7 @@ export class TruelimeDocs implements INodeType {
   description: INodeTypeDescription = {
       displayName: 'Truelime Docs',
       name: 'truelimeDocs',
-      icon: 'file:truelime.svg',
+      icon: 'file:truelime-logo-n8n-plain.svg',
       group: ['transform'],
       version: 1,
       subtitle: '={{$parameter["operation"]}}',
@@ -61,7 +61,7 @@ export class TruelimeDocs implements INodeType {
       outputs: [ { type: NodeConnectionType.Main } ],
       credentials: [
           {
-              name: 'TruelimeDocsApi',
+              name: 'truelimeDocsApi',
               required: true,
           }
       ],
