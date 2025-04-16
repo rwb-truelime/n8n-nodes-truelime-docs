@@ -5,6 +5,7 @@ import {
   INodeExecutionData,
   IDataObject,
   NodeOperationError,
+	NodeConnectionType,
   IBinaryData,
 } from 'n8n-workflow';
 import { zerox, ZeroxArgs, ModelCredentials, ErrorMode as ZeroxErrorMode, ModelProvider as ZeroxModelProvider } from 'truelime-zerox';
@@ -35,37 +36,49 @@ const parsePages = (pagesStr: string | undefined): number[] | number | undefined
 };
 
 
-export class Zerox implements INodeType {
+export class TruelimeDocs implements INodeType {
   description: INodeTypeDescription = {
       displayName: 'Truelime Docs',
-      name: 'truelimeDocs', // Changed to camelCase as per convention
-      icon: 'file:truelime-zwart.png', // Ensure this icon exists in the node's folder
+      name: 'truelimeDocs',
+      icon: 'file:truelime.svg',
       group: ['transform'],
       version: 1,
       subtitle: '={{$parameter["operation"]}}',
-      description: 'OCR & Document Extraction using vision models via zerox-truelime',
+      description: 'OCR & Document Extraction using vision models via Truelime Docs processing',
       defaults: {
           name: 'Truelime Docs',
       },
-      inputs: ['main'], // Standard way to define inputs/outputs
-      outputs: ['main', 'main'], // Add error output
-      outputNames: ['Success', 'Error'], // Naming the outputs
+      // eslint-disable-next-line n8n-nodes-base/node-class-description-inputs-wrong-regular-node
+      inputs: [
+				{
+						displayName: 'Input Data',
+						type: NodeConnectionType.Main,
+						required: true
+				}
+		],
+      // eslint-disable-next-line n8n-nodes-base/node-class-description-outputs-wrong
+      outputs: [
+          { type: NodeConnectionType.Main }, // Corresponds to 'Success'
+          { type: NodeConnectionType.Main }  // Corresponds to 'Error'
+      ],
+      outputNames: ['Success', 'Error'],
       credentials: [
           {
-              name: 'zeroxApi', // Matches the name in ZeroxApi.credentials.ts
+              name: 'TruelimeDocsApi',
               required: true,
-          },
+          }
       ],
       properties: [
           // Operation (kept simple as only one is defined)
           {
               displayName: 'Operation',
               name: 'operation',
-              type: 'hidden', // Hidden as there's only one option currently
+              type: 'hidden',
               default: 'processDocument',
           },
 
           // --- Core Parameters ---
+          // eslint-disable-next-line n8n-nodes-base/node-param-default-missing
           {
               displayName: 'Model Provider',
               name: 'modelProvider',
@@ -76,25 +89,24 @@ export class Zerox implements INodeType {
                   { name: 'Google', value: ZeroxModelProvider.GOOGLE },
                   { name: 'AWS Bedrock', value: ZeroxModelProvider.BEDROCK },
               ],
-              default: ZeroxModelProvider.OPENAI,
+              default: ZeroxModelProvider.OPENAI, // Default is correctly set using Enum
               required: true,
               description: 'The LLM provider to use for processing',
           },
           {
               displayName: 'Model',
               name: 'model',
-              type: 'options', // Consider making this dynamic based on provider if possible, or keep extensive list
-               options: [
-                  // Add common models - this list can be extensive
+              type: 'options',
+              // Alphabetized options
+              options: [
+                  { name: 'Claude 3 Haiku (Bedrock)', value: 'anthropic.claude-3-haiku-20240307-v1:0'},
+                  { name: 'Claude 3.5 Sonnet (Bedrock)', value: 'anthropic.claude-3-5-sonnet-20240620-v1:0' },
+                  { name: 'Gemini 1.5 Flash (Google)', value: 'gemini-1.5-flash-latest' },
+                  { name: 'Gemini 1.5 Pro (Google)', value: 'gemini-1.5-pro-latest' },
                   { name: 'GPT-4o (OpenAI/Azure)', value: 'gpt-4o' },
                   { name: 'GPT-4o Mini (OpenAI/Azure)', value: 'gpt-4o-mini' },
-                  { name: 'Claude 3.5 Sonnet (Bedrock)', value: 'anthropic.claude-3-5-sonnet-20240620-v1:0' },
-                  { name: 'Claude 3 Haiku (Bedrock)', value: 'anthropic.claude-3-haiku-20240307-v1:0'},
-                  { name: 'Gemini 1.5 Pro (Google)', value: 'gemini-1.5-pro-latest' }, // Use appropriate model IDs
-                  { name: 'Gemini 1.5 Flash (Google)', value: 'gemini-1.5-flash-latest' },
-                  // Add other relevant models...
               ],
-              default: 'gpt-4o', // Sensible default
+              default: 'gpt-4o', // Add default value
               description: 'The specific model identifier for the selected provider',
           },
           {
@@ -118,6 +130,7 @@ export class Zerox implements INodeType {
           },
 
           // --- Behavior ---
+           // eslint-disable-next-line n8n-nodes-base/node-param-default-missing
            {
               displayName: 'Error Mode',
               name: 'errorMode',
@@ -126,14 +139,15 @@ export class Zerox implements INodeType {
                   { name: 'Throw Error (Fail Node)', value: ZeroxErrorMode.THROW }, // Use Enum values
                   { name: 'Ignore Error (Output Empty)', value: ZeroxErrorMode.IGNORE },
               ],
-              default: ZeroxErrorMode.THROW,
+              default: ZeroxErrorMode.THROW, // Default is correctly set using Enum
               description: 'How the underlying zerox library should handle processing errors',
           },
+
            {
               displayName: 'Input Binary Field',
               name: 'binaryPropertyName',
               type: 'string',
-              default: 'data',
+              default: 'data', // Add default value
               required: true,
               description: 'Name of the binary property in the input item containing the file data',
           },
@@ -146,25 +160,26 @@ export class Zerox implements INodeType {
               placeholder: 'Add Processing Option',
               default: {},
               description: 'Optional settings to control the OCR and document handling process',
+              // Alphabetized options and fixed boolean descriptions
               options: [
-                  { displayName: 'Output Directory', name: 'outputDir', type: 'string', default: '', description: 'Directory to save intermediate/output files (optional, uses temp if empty)' },
-                  { displayName: 'Temporary Directory', name: 'tempDir', type: 'string', default: '', description: 'Directory for temporary processing files (optional, uses OS temp if empty)' },
                   { displayName: 'Cleanup Temp Files', name: 'cleanup', type: 'boolean', default: true, description: 'Whether zerox should clean up its temporary files' },
                   { displayName: 'Concurrency', name: 'concurrency', type: 'number', default: 10, description: 'Internal concurrency limit for zerox operations' },
-                  { displayName: 'Correct Orientation', name: 'correctOrientation', type: 'boolean', default: true, description: 'Attempt to auto-correct document image orientation' },
-                  { displayName: 'Direct Image Extraction', name: 'directImageExtraction', type: 'boolean', default: false, description: 'Extract directly from images without full OCR (if applicable)' },
-                  { displayName: 'Enable Hybrid Extraction', name: 'enableHybridExtraction', type: 'boolean', default: false, description: 'Use hybrid OCR/extraction methods (if applicable)' },
-                  { displayName: 'Extract Only', name: 'extractOnly', type: 'boolean', default: false, description: 'Perform only extraction based on schema/prompt, assuming OCR is done or not needed' },
+                  { displayName: 'Correct Orientation', name: 'correctOrientation', type: 'boolean', default: true, description: 'Whether to attempt to auto-correct document image orientation' },
+                  { displayName: 'Direct Image Extraction', name: 'directImageExtraction', type: 'boolean', default: false, description: 'Whether to extract directly from images without full OCR (if applicable)' },
+                  { displayName: 'Enable Hybrid Extraction', name: 'enableHybridExtraction', type: 'boolean', default: false, description: 'Whether to use hybrid OCR/extraction methods (if applicable)' },
+                  { displayName: 'Extract Only', name: 'extractOnly', type: 'boolean', default: false, description: 'Whether to perform only extraction based on schema/prompt, assuming OCR is done or not needed' },
                   { displayName: 'Extract Per Page', name: 'extractPerPage', type: 'string', default: '', description: 'Comma-separated page numbers/ranges for targeted extraction' },
                   { displayName: 'Image Density (DPI)', name: 'imageDensity', type: 'number', default: 300, description: 'Target DPI for image conversion during OCR' },
                   { displayName: 'Image Height (Pixels)', name: 'imageHeight', type: 'number', default: 1500, description: 'Target height for image resizing (preserves aspect ratio)' },
-                  { displayName: 'Maintain Format', name: 'maintainFormat', type: 'boolean', default: false, description: 'Attempt to preserve original document formatting in markdown output' },
+                  { displayName: 'Maintain Format', name: 'maintainFormat', type: 'boolean', default: false, description: 'Whether to attempt to preserve original document formatting in markdown output' },
                   { displayName: 'Max Image Size (MB)', name: 'maxImageSize', type: 'number', default: 15, description: 'Maximum size for individual images sent to the LLM' },
                   { displayName: 'Max Retries', name: 'maxRetries', type: 'number', default: 1, description: 'Maximum number of retries for failed LLM calls within zerox' },
                   { displayName: 'Max Tesseract Workers', name: 'maxTesseractWorkers', type: 'number', default: -1, description: 'Max Tesseract workers (-1 for auto)' },
+                  { displayName: 'Output Directory', name: 'outputDir', type: 'string', default: '', description: 'Directory to save intermediate/output files (optional, uses temp if empty)' },
                   { displayName: 'Pages To Convert As Images', name: 'pagesToConvertAsImages', type: 'string', default: '', description: 'Comma-separated page numbers/ranges to force image conversion' },
                   { displayName: 'Prompt', name: 'prompt', type: 'string', default: '', typeOptions: { rows: 4 }, description: 'Custom prompt to guide the LLM extraction/analysis' },
-                  { displayName: 'Trim Edges', name: 'trimEdges', type: 'boolean', default: true, description: 'Attempt to trim whitespace/borders from document images' },
+                  { displayName: 'Temporary Directory', name: 'tempDir', type: 'string', default: '', description: 'Directory for temporary processing files (optional, uses OS temp if empty)' },
+                  { displayName: 'Trim Edges', name: 'trimEdges', type: 'boolean', default: true, description: 'Whether to attempt to trim whitespace/borders from document images' },
               ],
           },
           {
@@ -177,7 +192,7 @@ export class Zerox implements INodeType {
               options: [
                   // Similar structure for extractionModelProvider, extractionModel, customExtractionModel, extractionPrompt
                    { displayName: 'Extraction Model Provider', name: 'extractionModelProvider', type: 'options', options: [ { name: 'OpenAI', value: ZeroxModelProvider.OPENAI }, /* ... add others */ ], default: '', description: 'Override provider for extraction step' },
-                   { displayName: 'Extraction Model', name: 'extractionModel', type: 'options', options: [ { name: 'GPT-4o', value: 'gpt-4o' }, /* ... add others */ ], default: '', description: 'Override model for extraction step' },
+                   { displayName: 'Extraction Model', name: 'extractionModel', type: 'options', options: [ { name: 'GPT-4o', value: 'gpt-4o' }, /* ... add others */ ], default: 'gpt-4o', description: 'Override model for extraction step' }, // Fix default value
                    { displayName: 'Custom Extraction Model', name: 'customExtractionModel', type: 'string', default: '', description: 'Override custom model for extraction step' },
                    { displayName: 'Extraction Prompt', name: 'extractionPrompt', type: 'string', default: '', typeOptions: { rows: 4 }, description: 'Specific prompt for the extraction step' },
               ],
@@ -189,13 +204,14 @@ export class Zerox implements INodeType {
               placeholder: 'Add LLM Parameter',
               default: {},
               description: 'Optional parameters to control the main LLM generation',
+              // Alphabetized options
               options: [
+                  { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes frequent tokens' },
+                  { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false, description: 'Whether to return log probabilities (if supported)' },
+                  { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 4096, description: 'Max tokens for the LLM response' },
+                  { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes new tokens' },
                   { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Controls randomness (0=deterministic)' },
                   { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, description: 'Nucleus sampling parameter' },
-                  { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes frequent tokens' },
-                  { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes new tokens' },
-                  { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 4096, description: 'Max tokens for the LLM response' },
-                  { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false, description: 'Whether to return log probabilities (if supported)' },
               ],
           },
            {
@@ -205,14 +221,14 @@ export class Zerox implements INodeType {
               placeholder: 'Add Extraction LLM Parameter',
               default: {},
               description: 'Optional parameters to control the extraction LLM generation, overriding main LLM parameters',
+              // Alphabetized options
               options: [
-                   // Similar structure for temperature, topP, etc. specific to extraction
+                   { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0 },
+                   { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false },
+                   { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 4096 },
+                   { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0 },
                    { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0 },
                    { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1 },
-                   { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0 },
-                   { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0 },
-                   { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 4096 },
-                   { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false },
               ],
           },
       ],
@@ -262,7 +278,7 @@ export class Zerox implements INodeType {
       const globalExtractionLlmParameters = this.getNodeParameter('extractionLlmParameters', 0, {}) as IDataObject;
 
       // --- Get Credentials ---
-      const credentials = await this.getCredentials('zeroxApi') as IDataObject;
+      const credentials = await this.getCredentials('TruelimeDocsApi') as IDataObject;
 
       // --- Prepare Base Credentials (using IDataObject for flexibility) ---
       const baseModelCredentials: IDataObject = {};

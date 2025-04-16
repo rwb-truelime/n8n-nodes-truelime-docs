@@ -1,9 +1,9 @@
 import { ICredentialType, INodeProperties } from 'n8n-workflow';
 
-export class ZeroxApi implements ICredentialType {
-    name = 'zeroxApi';
-    displayName = 'Zerox API Credentials';
-    documentationUrl = 'https://github.com/truelime-dev/zerox-truelime'; // Replace with actual docs URL if available
+export class TruelimeDocsApi implements ICredentialType {
+    name = 'truelimeDocsApi';
+    displayName = 'Truelime Docs Credentials API';
+    documentationUrl = 'https://github.com/truelime-dev/zerox-truelime';
     properties: INodeProperties[] = [
         // OpenAI
         {
@@ -45,6 +45,7 @@ export class ZeroxApi implements ICredentialType {
             displayName: 'AWS Access Key ID',
             name: 'bedrockAccessKeyId',
             type: 'string',
+            typeOptions: { password: true },
             default: '',
             description: 'Your AWS Access Key ID for Bedrock',
         },
