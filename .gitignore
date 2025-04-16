@@ -6,3 +6,10 @@ dist
 npm-debug.log*
 yarn.lock
 .vscode/launch.json
+*.tgz
+*.tar.gz
+*.zip
+*.tar
+*.gz
+*.rar
+*.7z
