@@ -1,25 +1,29 @@
 {
-  "name": "n8n-nodes-<...>",
+  "name": "n8n-nodes-truelime-docs",
   "version": "0.1.0",
-  "description": "",
+  "description": "N8N node for Zerox OCR & Document Extraction",
   "keywords": [
-    "n8n-community-node-package"
+    "n8n-community-node-package",
+    "zerox",
+    "ocr",
+    "document-extraction",
+    "vision-models"
   ],
   "license": "MIT",
-  "homepage": "",
+  "homepage": "https://truelime.nl",
   "author": {
-    "name": "",
-    "email": ""
+    "name": "Rodger Blom",
+    "email": "rodger.blom@truelime.nl"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/<...>/n8n-nodes-<...>.git"
+    "url": "https://github.com/rwb-truelime/n8n-nodes-truelime-doc.git"
   },
   "engines": {
     "node": ">=18.10",
     "pnpm": ">=9.1"
   },
-  "packageManager": "pnpm@9.1.4",
+  "packageManager": "pnpm@10.8.1",
   "main": "index.js",
   "scripts": {
     "preinstall": "npx only-allow pnpm",
@@ -36,23 +40,24 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/ExampleCredentialsApi.credentials.js",
-      "dist/credentials/HttpBinApi.credentials.js"
+      "dist/credentials/TruelimeDocsApi.credentials.ts"
     ],
     "nodes": [
-      "dist/nodes/ExampleNode/ExampleNode.node.js",
-      "dist/nodes/HttpBin/HttpBin.node.js"
+      "dist/nodes/TruelimeDocs/TruelimeDocs.node.ts"
     ]
   },
   "devDependencies": {
-    "@typescript-eslint/parser": "^7.15.0",
-    "eslint": "^8.56.0",
-    "eslint-plugin-n8n-nodes-base": "^1.16.1",
-    "gulp": "^4.0.2",
-    "prettier": "^3.3.2",
-    "typescript": "^5.5.3"
+    "@typescript-eslint/parser": "^8.30.1",
+    "eslint": "^9.24.0",
+    "eslint-plugin-n8n-nodes-base": "^1.16.3",
+    "gulp": "^5.0.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "truelime-zerox": "file:zerox-truelime-1.1.17.tgz"
   },
   "peerDependencies": {
-    "n8n-workflow": "*"
+    "n8n-workflow": "^1.82.0"
   }
 }
