@@ -127,6 +127,34 @@ export class LimescapeDocs implements INodeType {
                   rows: 5, // Adjust editor size
               },
           },
+          {
+              displayName: 'Attachment Filter',
+              name: 'attachmentFilter',
+              type: 'collection',
+              placeholder: 'Add filter',
+              default: {},
+              description: 'Filter which attachments to process based on file extension',
+              options: [
+                  {
+                      displayName: 'Filter Mode',
+                      name: 'filterMode',
+                      type: 'options',
+                      options: [
+                          { name: 'Include (only Process These Extensions)', value: 'include' },
+                          { name: 'Exclude (Skip These Extensions)', value: 'exclude' },
+                      ],
+                      default: 'include',
+                      description: 'Choose whether to include or exclude the listed extensions',
+                  },
+                  {
+                      displayName: 'Extensions',
+                      name: 'extensions',
+                      type: 'string',
+                      default: 'pdf,doc,docx,odt,ott,rtf,txt,html,htm,xml,wps,wpd,xls,xlsx,ods,ots,csv,tsv,ppt,pptx,odp,otp',
+                      description: 'Comma-separated file extensions to include or exclude (no dot, e.g. pdf, docx). You can enter any extension.',
+                  },
+              ],
+          },
 
           // --- Behavior ---
            {
@@ -336,11 +364,33 @@ export class LimescapeDocs implements INodeType {
 
 
       // --- Process Each Item ---
+      // Get attachment filter settings
+      const attachmentFilter = this.getNodeParameter('attachmentFilter', 0, {}) as IDataObject;
+      const filterMode = (attachmentFilter.filterMode as string) || 'include';
+      const extensions = typeof attachmentFilter.extensions === 'string'
+          ? attachmentFilter.extensions.split(',').map(e => e.trim().toLowerCase()).filter(e => !!e)
+          : [];
+
       for (let i = 0; i < items.length; i++) {
           let tempFilePath: string | null = null;
           let currentFilename = `item_${i}_binary`; // Default filename
           let currentExtension = '';
           const item = items[i];
+
+          // --- Attachment filter logic ---
+          if (item.binary) {
+              const binaryData = item.binary[binaryPropertyName] as IBinaryData;
+              currentFilename = binaryData.fileName || currentFilename;
+              currentExtension = path.extname(currentFilename).substring(1).toLowerCase();
+              // Apply filter
+              const shouldProcess = filterMode === 'include'
+                  ? extensions.includes(currentExtension)
+                  : !extensions.includes(currentExtension);
+              if (!shouldProcess) {
+                  aggregatedResults.processingIssues.push(`Skipped Item ${i} (${currentFilename}): Filtered out by attachment filter.`);
+                  continue;
+              }
+          }
 
           try {
               // --- 1. Get Binary Data ---
