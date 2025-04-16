@@ -120,7 +120,7 @@ export class LimescapeDocs implements INodeType {
               displayName: 'Schema (Optional)',
               name: 'schema',
               type: 'json',
-              default: '', // Default to empty string for optional JSON
+              default: '{}', // Set to empty object for best UX
               description: 'JSON schema for structured data extraction (if supported by model/prompt)',
               placeholder: '{\n  "type": "object",\n  "properties": {\n    "invoice_number": { "type": "string" }\n  }\n}',
               typeOptions: {
