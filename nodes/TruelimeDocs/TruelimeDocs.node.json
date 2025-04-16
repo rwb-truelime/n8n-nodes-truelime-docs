@@ -1,0 +1,16 @@
+{
+  "node": "n8n-nodes-base.truelimeDocs",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": [
+    "Utility",
+    "Productivity"
+  ],
+  "resources": {
+    "documentation": [
+      {
+        "url": "https://github.com/rwb-truelime/n8n-nodes-truelime-doc"
+      }
+    ]
+  }
+}

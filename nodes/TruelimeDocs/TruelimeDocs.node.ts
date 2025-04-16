@@ -56,12 +56,9 @@ export class TruelimeDocs implements INodeType {
 						required: true
 				}
 		],
+      // Define only the main success output
       // eslint-disable-next-line n8n-nodes-base/node-class-description-outputs-wrong
-      outputs: [
-          { type: NodeConnectionType.Main }, // Corresponds to 'Success'
-          { type: NodeConnectionType.Main }  // Corresponds to 'Error'
-      ],
-      outputNames: ['Success', 'Error'],
+      outputs: [ { type: NodeConnectionType.Main } ],
       credentials: [
           {
               name: 'TruelimeDocsApi',
@@ -208,9 +205,9 @@ export class TruelimeDocs implements INodeType {
               options: [
                   { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes frequent tokens' },
                   { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false, description: 'Whether to return log probabilities (if supported)' },
-                  { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 4096, description: 'Max tokens for the LLM response' },
+                  { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 8192, description: 'Max tokens for the LLM response' },
                   { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes new tokens' },
-                  { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Controls randomness (0=deterministic)' },
+                  { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.2, description: 'Controls randomness (0=deterministic)' },
                   { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, description: 'Nucleus sampling parameter' },
               ],
           },
@@ -225,9 +222,9 @@ export class TruelimeDocs implements INodeType {
               options: [
                    { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0 },
                    { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false },
-                   { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 4096 },
+                   { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 8192 },
                    { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0 },
-                   { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0 },
+                   { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1 },
                    { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1 },
               ],
           },
@@ -237,9 +234,8 @@ export class TruelimeDocs implements INodeType {
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
       const items = this.getInputData();
       const successData: INodeExecutionData[] = [];
-      const errorData: INodeExecutionData[] = [];
 
-      // --- Aggregation Variables (Declare before loop) ---
+      // --- Aggregation Variables ---
       let aggregatedResults: {
           filenames: string[];
           filetypes: string[];
@@ -348,14 +344,7 @@ export class TruelimeDocs implements INodeType {
           try {
               // --- 1. Get Binary Data ---
               if (!item.binary || !item.binary[binaryPropertyName]) {
-                  const msg = `Skipping item ${i}: No binary data found in property '${binaryPropertyName}'.`;
-                  aggregatedResults.processingIssues.push(msg);
-                  if (this.continueOnFail()) {
-                       errorData.push({ json: { error: msg, details: 'Missing binary data' }, pairedItem: { item: i } });
-                       continue;
-                  } else {
-                      throw new NodeOperationError(this.getNode(), msg, { itemIndex: i });
-                  }
+                  throw new NodeOperationError(this.getNode(), `Missing binary data in property '${binaryPropertyName}' for item ${i}.`, { itemIndex: i });
               }
               const binaryData = item.binary[binaryPropertyName] as IBinaryData;
               currentFilename = binaryData.fileName || currentFilename;
@@ -451,17 +440,11 @@ export class TruelimeDocs implements INodeType {
 
           } catch (error) {
               const errorMessage = error instanceof Error ? error.message : String(error);
-              aggregatedResults.processingIssues.push(`Item ${i} (${currentFilename || 'unknown'}) Error: ${errorMessage}`);
 
-              if (this.continueOnFail()) {
-                  errorData.push({ json: { error: errorMessage, filename: currentFilename, itemIndex: i }, pairedItem: { item: i } });
-                  // Loop continues automatically
+              if (error instanceof NodeOperationError) {
+                  throw error;
               } else {
-                  if (error instanceof NodeOperationError) {
-                      throw error;
-                  } else {
-                      throw new NodeOperationError(this.getNode(), `Error processing item ${i} (${currentFilename || 'unknown'}): ${errorMessage}`, { itemIndex: i });
-                  }
+                  throw new NodeOperationError(this.getNode(), `Error processing item ${i} (${currentFilename || 'unknown'}): ${errorMessage}`, { itemIndex: i });
               }
           } finally {
               // --- 6. Cleanup Temporary File ---
@@ -493,13 +476,13 @@ export class TruelimeDocs implements INodeType {
               processingIssues: aggregatedResults.processingIssues,
           };
            successData.push({ json: finalJsonOutput });
-      } else if (items.length > 0 && processedFileCount === 0 && errorData.length === 0 && aggregatedResults.processingIssues.length === 0) {
-           successData.push({ json: { message: "No files were processed or resulted in errors.", processingIssues: aggregatedResults.processingIssues } });
+      } else if (items.length > 0 && processedFileCount === 0 && aggregatedResults.processingIssues.length > 0) {
+           successData.push({ json: { message: "All items resulted in errors.", processingIssues: aggregatedResults.processingIssues } });
       } else if (items.length === 0) {
            successData.push({ json: { message: "No input items received." } });
       }
 
-      // Return data for both success and error outputs
-      return [successData, errorData];
+      // Return only success data
+      return [successData];
   }
 }

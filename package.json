@@ -1,10 +1,16 @@
 {
   "name": "n8n-nodes-truelime-docs",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "N8N node for Zerox OCR & Document Extraction",
   "keywords": [
     "n8n-community-node-package",
-    "zerox",
+    "vision",
+    "multi-modal",
+    "document",
+    "document-processing",
+    "truelime",
+    "truelime-docs",
+    "truelime-docs-processor",
     "ocr",
     "document-extraction",
     "vision-models"
