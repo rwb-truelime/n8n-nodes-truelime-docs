@@ -25,7 +25,7 @@ export default defineConfig([
             },
 
             parser: tsParser,
-            ecmaVersion: 5,
+            ecmaVersion: 2019, // <-- Update ecmaVersion
             sourceType: "module",
 
             parserOptions: {
@@ -43,7 +43,8 @@ export default defineConfig([
         },
 
         rules: {
-            "n8n-nodes-base/community-package-json-name-still-default": "off",
+            // Ensure this rule is set according to your needs (error for prepublish check)
+            "n8n-nodes-base/community-package-json-name-still-default": "error",
         },
     },
     {
