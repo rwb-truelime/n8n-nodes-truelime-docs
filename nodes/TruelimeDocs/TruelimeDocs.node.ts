@@ -8,7 +8,7 @@ import {
 	NodeConnectionType,
   IBinaryData,
 } from 'n8n-workflow';
-import { zerox, ZeroxArgs, ModelCredentials, ErrorMode as ZeroxErrorMode, ModelProvider as ZeroxModelProvider } from 'truelime-zerox';
+import { zerox, ZeroxArgs, ModelCredentials, ErrorMode as ZeroxErrorMode, ModelProvider as ZeroxModelProvider } from 'truelime-docs-processor';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
