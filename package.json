@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-limescape-docs",
-  "version": "1.0.0",
+  "version": "1.1.19",
   "description": "N8N node for Zerox OCR & Document Extraction",
   "keywords": [
     "n8n-community-node-package",
@@ -53,15 +53,15 @@
     ]
   },
   "devDependencies": {
-    "@typescript-eslint/parser": "^8.30.1",
-    "eslint": "^9.24.0",
+    "@typescript-eslint/parser": "^8.31.1",
+    "eslint": "^9.25.1",
     "eslint-plugin-n8n-nodes-base": "^1.16.3",
     "gulp": "^5.0.0",
     "prettier": "^3.5.3",
     "typescript": "^5.8.3"
   },
   "dependencies": {
-    "limescape-docs-processor": "file:limescape-docs-processor-1.1.17.tgz"
+    "limescape-docs-processor": "file:limescape-docs-processor-1.1.19.tgz"
   },
   "peerDependencies": {
     "n8n-workflow": "^1.82.0"
