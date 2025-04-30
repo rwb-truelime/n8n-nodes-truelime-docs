@@ -72,6 +72,7 @@ export class LimescapeDocs implements INodeType {
               name: 'operation',
               type: 'hidden',
               default: 'processDocument',
+              // No hint needed for hidden fields
           },
 
           // --- Core Parameters ---
@@ -89,6 +90,7 @@ export class LimescapeDocs implements INodeType {
               default: ZeroxModelProvider.OPENAI, // Default is correctly set using Enum
               required: true,
               description: 'The LLM provider to use for processing',
+              hint: 'Select the AI provider (e.g., OpenAI). Default: OpenAI. Required field.',
           },
           {
               displayName: 'Model',
@@ -107,6 +109,7 @@ export class LimescapeDocs implements INodeType {
               ],
               default: 'gpt-4.1', // Set GPT-4.1 as default
               description: 'The specific model identifier for the selected provider',
+              hint: 'Choose the AI model. Default: gpt-4.1. Can be overridden by Custom Model.',
           },
           {
               displayName: 'Custom Model',
@@ -115,6 +118,7 @@ export class LimescapeDocs implements INodeType {
               default: '',
               description: 'Overrides the Model selection. Use the exact model identifier required by the provider/library.',
               placeholder: 'e.g., gpt-4-turbo or specific Azure deployment ID',
+              hint: 'Optional: Enter a specific model ID to override the Model selection. Leave empty to use the selected Model.',
           },
            {
               displayName: 'Schema (Optional)',
@@ -126,6 +130,7 @@ export class LimescapeDocs implements INodeType {
               typeOptions: {
                   rows: 5, // Adjust editor size
               },
+              hint: 'Optional: Provide a JSON schema for structured output. Default: {}.',
           },
           {
               displayName: 'Attachment Filter',
@@ -134,6 +139,7 @@ export class LimescapeDocs implements INodeType {
               placeholder: 'Add filter',
               default: {},
               description: 'Filter which attachments to process based on file extension',
+              hint: 'Optional: Define rules to include or exclude attachments based on their file extension.',
               options: [
                   {
                       displayName: 'Filter Mode',
@@ -145,6 +151,7 @@ export class LimescapeDocs implements INodeType {
                       ],
                       default: 'include',
                       description: 'Choose whether to include or exclude the listed extensions',
+                      hint: 'Select if the extensions list is for inclusion or exclusion. Default: include.',
                   },
                   {
                       displayName: 'Extensions',
@@ -152,6 +159,7 @@ export class LimescapeDocs implements INodeType {
                       type: 'string',
                       default: 'pdf,doc,docx,odt,ott,rtf,txt,html,htm,xml,wps,wpd,xls,xlsx,ods,ots,csv,tsv,ppt,pptx,odp,otp',
                       description: 'Comma-separated file extensions to include or exclude (no dot, e.g. pdf, docx). You can enter any extension.',
+                      hint: 'Enter comma-separated extensions (no dots). Default includes common document types.',
                   },
               ],
           },
@@ -164,6 +172,7 @@ export class LimescapeDocs implements INodeType {
               default: 'data', // Add default value
               required: true,
               description: 'Name of the binary property in the input item containing the file data',
+              hint: 'Specify the field name holding the file data in the input item. Default: data. Required field.',
           },
 
           // --- Optional Settings Grouped ---
@@ -174,26 +183,27 @@ export class LimescapeDocs implements INodeType {
               placeholder: 'Add Processing Option',
               default: {},
               description: 'Optional settings to control the OCR and document handling process',
+              hint: 'Configure advanced OCR and document processing behaviors.',
               // Alphabetized options and fixed boolean descriptions
               options: [
-                  { displayName: 'Cleanup Temp Files', name: 'cleanup', type: 'boolean', default: true, description: 'Whether zerox should clean up its temporary files' },
-                  { displayName: 'Concurrency', name: 'concurrency', type: 'number', default: 10, description: 'Internal concurrency limit for zerox operations' },
-                  { displayName: 'Correct Orientation', name: 'correctOrientation', type: 'boolean', default: true, description: 'Whether to attempt to auto-correct document image orientation' },
-                  { displayName: 'Direct Image Extraction', name: 'directImageExtraction', type: 'boolean', default: false, description: 'Whether to extract directly from images without full OCR (if applicable)' },
-                  { displayName: 'Enable Hybrid Extraction', name: 'enableHybridExtraction', type: 'boolean', default: false, description: 'Whether to use hybrid OCR/extraction methods (if applicable)' },
-                  { displayName: 'Extract Only', name: 'extractOnly', type: 'boolean', default: false, description: 'Whether to perform only extraction based on schema/prompt, assuming OCR is done or not needed' },
-                  { displayName: 'Extract Per Page', name: 'extractPerPage', type: 'string', default: '', description: 'Comma-separated page numbers/ranges for targeted extraction' },
-                  { displayName: 'Image Density (DPI)', name: 'imageDensity', type: 'number', default: 300, description: 'Target DPI for image conversion during OCR' },
-                  { displayName: 'Image Height (Pixels)', name: 'imageHeight', type: 'number', default: 1500, description: 'Target height for image resizing (preserves aspect ratio)' },
-                  { displayName: 'Maintain Format', name: 'maintainFormat', type: 'boolean', default: false, description: 'Whether to attempt to preserve original document formatting in markdown output' },
-                  { displayName: 'Max Image Size (MB)', name: 'maxImageSize', type: 'number', default: 15, description: 'Maximum size for individual images sent to the LLM' },
-                  { displayName: 'Max Retries', name: 'maxRetries', type: 'number', default: 1, description: 'Maximum number of retries for failed LLM calls within zerox' },
-                  { displayName: 'Max Tesseract Workers', name: 'maxTesseractWorkers', type: 'number', default: -1, description: 'Max Tesseract workers (-1 for auto)' },
-                  { displayName: 'Output Directory', name: 'outputDir', type: 'string', default: '', description: 'Directory to save intermediate/output files (optional, uses temp if empty)' },
-                  { displayName: 'Pages To Convert As Images', name: 'pagesToConvertAsImages', type: 'string', default: '', description: 'Comma-separated page numbers/ranges to force image conversion' },
-                  { displayName: 'Prompt', name: 'prompt', type: 'string', default: '', typeOptions: { rows: 4 }, description: 'Custom prompt to guide the LLM extraction/analysis' },
-                  { displayName: 'Temporary Directory', name: 'tempDir', type: 'string', default: '', description: 'Directory for temporary processing files (optional, uses OS temp if empty)' },
-                  { displayName: 'Trim Edges', name: 'trimEdges', type: 'boolean', default: true, description: 'Whether to attempt to trim whitespace/borders from document images' },
+                  { displayName: 'Cleanup Temp Files', name: 'cleanup', type: 'boolean', default: true, description: 'Whether zerox should clean up its temporary files', hint: 'Automatically delete temporary files after processing. Default: true.' },
+                  { displayName: 'Concurrency', name: 'concurrency', type: 'number', default: 10, description: 'Internal concurrency limit for zerox operations', hint: 'Maximum parallel operations within the processor. Default: 10.' },
+                  { displayName: 'Correct Orientation', name: 'correctOrientation', type: 'boolean', default: true, description: 'Whether to attempt to auto-correct document image orientation', hint: 'Try to fix rotated pages. Default: true.' },
+                  { displayName: 'Direct Image Extraction', name: 'directImageExtraction', type: 'boolean', default: false, description: 'Whether to extract directly from images without full OCR (if applicable)', hint: 'Attempt extraction from images without OCR (faster but less accurate). Default: false.' },
+                  { displayName: 'Enable Hybrid Extraction', name: 'enableHybridExtraction', type: 'boolean', default: false, description: 'Whether to use hybrid OCR/extraction methods (if applicable)', hint: 'Use combined OCR/extraction techniques if supported. Default: false.' },
+                  { displayName: 'Extract Only', name: 'extractOnly', type: 'boolean', default: false, description: 'Whether to perform only extraction based on schema/prompt, assuming OCR is done or not needed', hint: 'Skip OCR and only perform extraction (useful if text is already available). Default: false.' },
+                  { displayName: 'Extract Per Page', name: 'extractPerPage', type: 'string', default: '', description: 'Comma-separated page numbers/ranges for targeted extraction', hint: 'Specify pages/ranges (e.g., 1,3-5) for extraction. Default: empty (all pages).' },
+                  { displayName: 'Image Density (DPI)', name: 'imageDensity', type: 'number', default: 150, description: 'Target DPI for image conversion during OCR', typeOptions: { minValue: 70 }, hint: 'Resolution for image conversion during OCR. Min: 70. Default: 150.' },
+                  { displayName: 'Image Height (Pixels)', name: 'imageHeight', type: 'number', default: 3072, description: 'Target height for image resizing (preserves aspect ratio)', hint: 'Resize images to this height before processing. Default: 3072.' },
+                  { displayName: 'Maintain Format', name: 'maintainFormat', type: 'boolean', default: false, description: 'Whether to attempt to preserve original document formatting in markdown output', hint: 'Try to keep original formatting in the Markdown output. Default: false.' },
+                  { displayName: 'Max Image Size (MB)', name: 'maxImageSize', type: 'number', default: 15, description: 'Maximum size for individual images sent to the LLM', hint: 'Limit the size of images sent to the AI model. Default: 15 MB.' },
+                  { displayName: 'Max Retries', name: 'maxRetries', type: 'number', default: 1, description: 'Maximum number of retries for failed LLM calls within zerox', hint: 'How many times to retry failed AI calls. Default: 1.' },
+                  { displayName: 'Max Tesseract Workers', name: 'maxTesseractWorkers', type: 'number', default: -1, description: 'Max Tesseract workers (-1 for auto)', hint: 'Number of parallel Tesseract OCR processes. Default: -1 (auto-detect).' },
+                  { displayName: 'Output Directory', name: 'outputDir', type: 'string', default: '', description: 'Directory to save intermediate/output files (optional, uses temp if empty)', hint: 'Optional: Save intermediate files here. Default: empty (uses system temp).' },
+                  { displayName: 'Pages To Convert As Images', name: 'pagesToConvertAsImages', type: 'string', default: '', description: 'Comma-separated page numbers/ranges to force image conversion', hint: 'Force specific pages/ranges (e.g., 1,3-5) to be treated as images. Default: empty.' },
+                  { displayName: 'Prompt', name: 'prompt', type: 'string', default: '', typeOptions: { rows: 4 }, description: 'Custom prompt to guide the LLM extraction/analysis', hint: 'Provide a custom prompt for the main AI processing step. Default: empty.' },
+                  { displayName: 'Temporary Directory', name: 'tempDir', type: 'string', default: '', description: 'Directory for temporary processing files (optional, uses OS temp if empty)', hint: 'Optional: Specify a directory for temporary files. Default: empty (uses system temp).' },
+                  { displayName: 'Trim Edges', name: 'trimEdges', type: 'boolean', default: true, description: 'Whether to attempt to trim whitespace/borders from document images', hint: 'Remove excess whitespace around page images. Default: true.' },
               ],
           },
           {
@@ -203,12 +213,13 @@ export class LimescapeDocs implements INodeType {
               placeholder: 'Add Extraction Option',
               default: {},
               description: 'Optional settings specific to the extraction model/prompt, overriding main settings if provided',
+              hint: 'Override model, provider, or prompt specifically for the extraction step.',
               options: [
                   // Similar structure for extractionModelProvider, extractionModel, customExtractionModel, extractionPrompt
-                   { displayName: 'Extraction Model Provider', name: 'extractionModelProvider', type: 'options', options: [ { name: 'OpenAI', value: ZeroxModelProvider.OPENAI }, /* ... add others */ ], default: '', description: 'Override provider for extraction step' },
-                   { displayName: 'Extraction Model', name: 'extractionModel', type: 'options', options: [ { name: 'GPT-4o', value: 'gpt-4o' }, /* ... add others */ ], default: 'gpt-4o', description: 'Override model for extraction step' }, // Fix default value
-                   { displayName: 'Custom Extraction Model', name: 'customExtractionModel', type: 'string', default: '', description: 'Override custom model for extraction step' },
-                   { displayName: 'Extraction Prompt', name: 'extractionPrompt', type: 'string', default: '', typeOptions: { rows: 4 }, description: 'Specific prompt for the extraction step' },
+                   { displayName: 'Extraction Model Provider', name: 'extractionModelProvider', type: 'options', options: [ { name: 'OpenAI', value: ZeroxModelProvider.OPENAI }, /* ... add others */ ], default: '', description: 'Override provider for extraction step', hint: 'Optional: Select a different AI provider just for extraction. Default: empty (use main provider).' },
+                   { displayName: 'Extraction Model', name: 'extractionModel', type: 'options', options: [ { name: 'GPT-4o', value: 'gpt-4o' }, /* ... add others */ ], default: 'gpt-4o', description: 'Override model for extraction step', hint: 'Optional: Select a different AI model just for extraction. Default: gpt-4o.' }, // Fix default value
+                   { displayName: 'Custom Extraction Model', name: 'customExtractionModel', type: 'string', default: '', description: 'Override custom model for extraction step', hint: 'Optional: Enter a specific model ID to override the Extraction Model. Default: empty.' },
+                   { displayName: 'Extraction Prompt', name: 'extractionPrompt', type: 'string', default: '', typeOptions: { rows: 4 }, description: 'Specific prompt for the extraction step', hint: 'Optional: Provide a prompt specifically for the extraction step. Default: empty (use main prompt or schema).' },
               ],
           },
           {
@@ -218,14 +229,15 @@ export class LimescapeDocs implements INodeType {
               placeholder: 'Add LLM Parameter',
               default: {},
               description: 'Optional parameters to control the main LLM generation',
+              hint: 'Fine-tune the behavior of the main AI model.',
               // Alphabetized options
               options: [
-                  { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes frequent tokens' },
-                  { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false, description: 'Whether to return log probabilities (if supported)' },
-                  { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 8192, description: 'Max tokens for the LLM response' },
-                  { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes new tokens' },
-                  { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.2, description: 'Controls randomness (0=deterministic)' },
-                  { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, description: 'Nucleus sampling parameter' },
+                  { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes frequent tokens', hint: 'Discourage repeating the same tokens. Default: 0.' },
+                  { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false, description: 'Whether to return log probabilities (if supported)', hint: 'Include token probabilities in the output (if model supports it). Default: false.' },
+                  { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 8192, description: 'Max tokens for the LLM response', typeOptions: { minValue: 1024, maxValue: 16383 }, hint: 'Maximum length of the AI response. Range: 1024-16383. Default: 8192.' },
+                  { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes new tokens', hint: 'Discourage introducing new topics. Default: 0.' },
+                  { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.2, description: 'Controls randomness (0=deterministic)', hint: 'Higher values mean more creativity, lower means more focused. Default: 0.2.' },
+                  { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, description: 'Nucleus sampling parameter', hint: 'Alternative to temperature for controlling randomness. Default: 1.' },
               ],
           },
            {
@@ -235,14 +247,15 @@ export class LimescapeDocs implements INodeType {
               placeholder: 'Add Extraction LLM Parameter',
               default: {},
               description: 'Optional parameters to control the extraction LLM generation, overriding main LLM parameters',
+              hint: 'Fine-tune the behavior of the extraction AI model, overriding main LLM parameters.',
               // Alphabetized options
               options: [
-                   { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0 },
-                   { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false },
-                   { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 8192 },
-                   { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0 },
-                   { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1 },
-                   { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1 },
+                   { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, hint: 'Extraction specific: Discourage repeating tokens. Default: 0.' },
+                   { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false, hint: 'Extraction specific: Include token probabilities. Default: false.' },
+                   { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 8192, typeOptions: { minValue: 1024, maxValue: 16383 }, hint: 'Extraction specific: Max response length. Range: 1024-16383. Default: 8192.' },
+                   { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, hint: 'Extraction specific: Discourage new topics. Default: 0.' },
+                   { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, hint: 'Extraction specific: Controls randomness. Default: 0.1.' },
+                   { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, hint: 'Extraction specific: Nucleus sampling. Default: 1.' },
               ],
           },
       ],
@@ -288,6 +301,33 @@ export class LimescapeDocs implements INodeType {
       const globalExtractionOptions = this.getNodeParameter('extractionOptions', 0, {}) as IDataObject;
       const globalLlmParameters = this.getNodeParameter('llmParameters', 0, {}) as IDataObject;
       const globalExtractionLlmParameters = this.getNodeParameter('extractionLlmParameters', 0, {}) as IDataObject;
+
+      // --- Parameter Validation Safeguards ---
+      // Validate maxTokens in both LLM Parameters and Extraction LLM Parameters
+      const checkMaxTokens = (params: IDataObject, context: string) => {
+        if (params && params.maxTokens !== undefined && params.maxTokens !== null) {
+          const val = Number(params.maxTokens);
+          if (isNaN(val) || val < 1024 || val > 16383) {
+            throw new NodeOperationError(this.getNode(), `${context}: Max Tokens must be between 1024 and 16383.`, { itemIndex: -1 });
+          }
+        }
+      };
+      checkMaxTokens(globalLlmParameters, 'LLM Parameters');
+      checkMaxTokens(globalExtractionLlmParameters, 'Extraction LLM Parameters');
+
+      // Validate imageDensity in Processing Options
+      if (globalProcessingOptions && globalProcessingOptions.imageDensity !== undefined) {
+        const density = Number(globalProcessingOptions.imageDensity);
+        if (
+          globalProcessingOptions.imageDensity === null ||
+          globalProcessingOptions.imageDensity === '' ||
+          isNaN(density) ||
+          density === 0 ||
+          density < 70
+        ) {
+          throw new NodeOperationError(this.getNode(), 'Processing Options: Image Density (DPI) must be a number and at least 70.', { itemIndex: -1 });
+        }
+      }
 
       // --- Get Credentials ---
       const credentials = await this.getCredentials('limescapeDocsApi') as IDataObject;
@@ -440,7 +480,9 @@ export class LimescapeDocs implements INodeType {
               if (globalSchema) zeroxArgs.schema = globalSchema;
 
                const pagesToConvert = parsePages(globalProcessingOptions.pagesToConvertAsImages as string);
-               if (pagesToConvert !== undefined) zeroxArgs.pagesToConvertAsImages = pagesToConvert;
+               if (pagesToConvert !== undefined) {
+                   zeroxArgs.pagesToConvertAsImages = Array.isArray(pagesToConvert) ? pagesToConvert : [pagesToConvert];
+               }
 
                const extractPerPageStr = globalProcessingOptions.extractPerPage as string;
                if (extractPerPageStr) {
