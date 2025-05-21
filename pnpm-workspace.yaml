@@ -1,4 +1,6 @@
 onlyBuiltDependencies:
+  - cpu-features
   - eslint-plugin-n8n-nodes-base
   - limescape-docs-processor
+  - ssh2
   - zerox
