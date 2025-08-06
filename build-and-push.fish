@@ -42,7 +42,8 @@ set_color normal
 run_step "Linting (fixing your sins...)" "pnpm lint --fix"
 run_step "Building (summoning the TypeScript demons...)" "pnpm run build"
 run_step "Packing (compressing your hopes and dreams...)" "pnpm pack"
-run_step "Docker Build (because it worked on my machine...)" "docker build -t tlteamai.azurecr.io/n8n/truelime-n8n:latest ."
+run_step "Docker pull the latest N8N image (because we don't trust the cloud...)" "docker pull docker.n8n.io/n8nio/n8n:latest"
+run_step "Docker Build (because it worked on my machine...)" "docker build --no-cache  -t tlteamai.azurecr.io/n8n/truelime-n8n:latest ."
 run_step "Docker Push (uploading to the cloud, where bugs go to multiply...)" "docker push tlteamai.azurecr.io/n8n/truelime-n8n:latest"
 
 echo
