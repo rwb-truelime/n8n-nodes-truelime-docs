@@ -100,8 +100,9 @@ export class LimescapeDocs implements INodeType {
 								options: [
 									{ name: 'Claude 3 Haiku (Bedrock)', value: 'anthropic.claude-3-haiku-20240307-v1:0'},
 									{ name: 'Claude 3.5 Sonnet (Bedrock)', value: 'anthropic.claude-3-5-sonnet-20240620-v1:0' },
-									{ name: 'Gemini 1.5 Flash (Google)', value: 'gemini-1.5-flash-latest' },
-									{ name: 'Gemini 1.5 Pro (Google)', value: 'gemini-1.5-pro-latest' },
+									{ name: 'Gemini 1.5 Flash (Google)', value: 'gemini-1.5-flash' },
+									{ name: 'Gemini 1.5 Pro (Google)', value: 'gemini-1.5-pro' },
+									{ name: 'Gemini 2.5 Pro (Google)', value: 'gemini-2.5-pro' },
 									{ name: 'GPT-4.1 (OpenAI/Azure)', value: 'gpt-4.1' },
 									{ name: 'GPT-4.1 Mini (OpenAI/Azure)', value: 'gpt-4.1-mini' },
 									{ name: 'GPT-4.1 Mini Standard (OpenAI/Azure)', value: 'gpt-4.1-mini-standard' },
