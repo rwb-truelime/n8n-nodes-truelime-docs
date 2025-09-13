@@ -7,7 +7,7 @@ WORKDIR /usr/local/lib/node_modules/n8n
 RUN apk update && apk add --no-cache ghostscript libreoffice ffmpeg poppler-utils
 
 # Install the desired npm module(s)
-# RUN npm install langfuse --loglevel verbose
+RUN npm i -g langfuse-langchain --loglevel verbose
 
 # Install the custom nodes
 RUN mkdir /home/node/.n8n/nodes
@@ -19,4 +19,3 @@ RUN cd /home/node/.n8n/nodes/ && npm install ./n8n-nodes-limescape-docs-1.1.20.t
 WORKDIR /home/node
 USER node
 COPY ai-ktl.jpg .
-
