@@ -53,6 +53,21 @@ const LOGPREFIX = '[Tracing]'
 const LOG_LEVEL = getEnv('TRACING_LOG_LEVEL', 'info')
 const DEBUG = LOG_LEVEL === 'debug'
 
+// Toggle dynamic workflow trace naming (otherwise keep low-cardinality constant name)
+const DYNAMIC_WORKFLOW_TRACE_NAME = envBool(
+  'TRACING_DYNAMIC_WORKFLOW_TRACE_NAME',
+  false,
+)
+
+function sanitizeSegment(value, def = 'unknown') {
+  if (!value) return def
+  return String(value)
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9._-]/g, '-')
+    .slice(0, 80) || def
+}
+
 // Process all OTEL_* environment variables to strip quotes.
 // Fixes issues with quotes in Docker env vars breaking the OTLP exporter.
 processOtelEnvironmentVariables()
@@ -94,6 +109,11 @@ console.log(
 const sdk = setupOpenTelemetryNodeSDK()
 
 sdk.start()
+
+// Helper: derive a session id. For now we treat each execution as its own session.
+function deriveSessionId(executionId) {
+  return executionId || 'unknown'
+}
 
 ////////////////////////////////////////////////////////////
 // HELPER FUNCTIONS
@@ -242,24 +262,80 @@ function setupN8nOpenTelemetry() {
       const workflowId = wfData?.id ?? ''
       const workflowName = wfData?.name ?? ''
 
+      // Attempt to resolve execution id from several potential locations (varies across n8n versions)
+      const executionId =
+        this?.executionId ||
+        this?.workflowExecuteAdditionalData?.executionId ||
+        this?.additionalData?.executionId ||
+        'unknown'
+      const sessionId = deriveSessionId(executionId)
+
       const workflowAttributes = {
         'n8n.workflow.id': workflowId,
         'n8n.workflow.name': workflowName,
+        'n8n.execution.id': executionId,
+        'n8n.session.id': sessionId,
         ...flatten(wfData?.settings ?? {}, {
           delimiter: '.',
           transformKey: (key) => `n8n.workflow.settings.${key}`,
         }),
       }
+
+      // If the active parent span is the auto-instrumented HTTP server span (named GET/POST/etc),
+      // rename it so Langfuse trace list shows a workflow-centric name instead of HTTP verb.
+      // We detect it heuristically by http.method attribute or name = HTTP verb.
+      const activeParent = trace.getSpan(context.active())
+      if (activeParent) {
+        const httpMethodAttr =
+          activeParent.attributes &&
+          (activeParent.attributes['http.method'] ||
+            activeParent.attributes['http.request.method'])
+        const nameLooksHttpVerb = /^(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)$/i.test(
+          activeParent.name || '',
+        )
+        if (httpMethodAttr || nameLooksHttpVerb) {
+          const originalName = activeParent.name
+          // Build new trace (root) name
+          let newRootName = 'n8n.workflow'
+          if (DYNAMIC_WORKFLOW_TRACE_NAME) {
+            newRootName = `${sanitizeSegment(workflowId, 'wf')}-${sanitizeSegment(
+              workflowName,
+              'workflow',
+            )}-${sanitizeSegment(executionId, 'exec')}`
+          } else {
+            // still low cardinality but more explicit
+            newRootName = 'n8n.workflow.request'
+          }
+          try {
+            activeParent.updateName(newRootName)
+            // Attach workflow attributes also to root span so they are visible in trace list
+            for (const [k, v] of Object.entries(workflowAttributes)) {
+              if (activeParent.attributes?.[k] === undefined) {
+                activeParent.setAttribute(k, v)
+              }
+            }
+            activeParent.setAttribute('n8n.http.original_name', originalName)
+            activeParent.setAttribute('n8n.trace.naming', DYNAMIC_WORKFLOW_TRACE_NAME ? 'dynamic' : 'constant')
+          } catch (err) {
+            if (DEBUG) console.warn('[Tracing] Failed to rename HTTP root span', err)
+          }
+        }
+      }
+
+      // Keep span name constant (low-cardinality) to avoid metrics explosion.
       const span = tracer.startSpan('n8n.workflow.execute', {
         attributes: workflowAttributes,
         kind: SpanKind.INTERNAL,
       })
 
       if (DEBUG) {
-        console.debug(`${LOGPREFIX}: starting n8n workflow:`, workflow)
+        console.debug(`${LOGPREFIX}: starting n8n workflow (low-cardinality)`, {
+          workflowId,
+          executionId,
+          sessionId,
+        })
       }
 
-      // Set the span as active
       const activeContext = trace.setSpan(context.active(), span)
       return context.with(activeContext, () => {
         const cancelable = originalProcessRun.apply(this, arguments)
@@ -353,11 +429,14 @@ function setupN8nOpenTelemetry() {
       // }
 
       const executionId = additionalData?.executionId ?? 'unknown'
+      const sessionId = deriveSessionId(executionId)
       const userId = additionalData?.userId ?? 'unknown'
       const nodeAttributes = {
         'n8n.workflow.id': workflow?.id ?? 'unknown',
         'n8n.execution.id': executionId,
+        'n8n.session.id': sessionId,
         'n8n.user.id': userId,
+        'n8n.node.name': node?.name || 'unknown',
         // "n8n.credentials": credInfo || "none",
       }
 
