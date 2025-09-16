@@ -52,12 +52,17 @@ function shouldEnableOtelLogs() {
 const LOGPREFIX = '[Tracing]'
 const LOG_LEVEL = getEnv('TRACING_LOG_LEVEL', 'info')
 const DEBUG = LOG_LEVEL === 'debug'
+// If true, disable auto-instrumentations and emit ONLY the manual workflow + node spans.
+const ONLY_WORKFLOW_SPANS = envBool('TRACING_ONLY_WORKFLOW_SPANS', false)
 
 // Toggle dynamic workflow trace naming (otherwise keep low-cardinality constant name)
 const DYNAMIC_WORKFLOW_TRACE_NAME = envBool(
   'TRACING_DYNAMIC_WORKFLOW_TRACE_NAME',
   false,
 )
+// Optional explicit pattern overrides boolean flag. Supports placeholders:
+// {workflowId} {workflowName} {executionId} {sessionId}
+const WORKFLOW_SPAN_NAME_PATTERN = process.env.TRACING_WORKFLOW_SPAN_NAME_PATTERN
 
 function sanitizeSegment(value, def = 'unknown') {
   if (!value) return def
@@ -68,6 +73,32 @@ function sanitizeSegment(value, def = 'unknown') {
     .slice(0, 80) || def
 }
 
+function buildWorkflowSpanName({
+  workflowId,
+  workflowName,
+  executionId,
+  sessionId,
+}) {
+  // Pattern has highest precedence
+  if (WORKFLOW_SPAN_NAME_PATTERN && WORKFLOW_SPAN_NAME_PATTERN.trim()) {
+    const name = WORKFLOW_SPAN_NAME_PATTERN
+      .replace(/\{workflowId\}/g, sanitizeSegment(workflowId, 'wf'))
+      .replace(/\{workflowName\}/g, sanitizeSegment(workflowName, 'workflow'))
+      .replace(/\{executionId\}/g, sanitizeSegment(executionId, 'exec'))
+      .replace(/\{sessionId\}/g, sanitizeSegment(sessionId, 'sess'))
+      .slice(0, 180)
+    return name || 'n8n.workflow.execute'
+  }
+  if (DYNAMIC_WORKFLOW_TRACE_NAME) {
+    return `${sanitizeSegment(workflowId, 'wf')}-${sanitizeSegment(
+      workflowName,
+      'workflow',
+    )}-${sanitizeSegment(executionId, 'exec')}`
+  }
+  // Low-cardinality default
+  return 'n8n.workflow.execute'
+}
+
 // Process all OTEL_* environment variables to strip quotes.
 // Fixes issues with quotes in Docker env vars breaking the OTLP exporter.
 processOtelEnvironmentVariables()
@@ -76,23 +107,20 @@ console.log(`${LOGPREFIX}: Starting n8n OpenTelemetry instrumentation`)
 
 // Configure OpenTelemetry
 // Turn off auto-instrumentation for dns, net, tls, fs, pg
-const autoInstrumentations = getNodeAutoInstrumentations({
-  '@opentelemetry/instrumentation-dns': { enabled: false },
-  '@opentelemetry/instrumentation-net': { enabled: false },
-  '@opentelemetry/instrumentation-tls': { enabled: false },
-  '@opentelemetry/instrumentation-fs': { enabled: false },
-  '@opentelemetry/instrumentation-pg': {
-    enabled: false,
-  },
-  // Enable enhancedDatabaseReporting for pg
-  // '@opentelemetry/instrumentation-pg': {
-  //   enhancedDatabaseReporting: true,
-  // },
-})
-
-registerInstrumentations({
-  instrumentations: [autoInstrumentations],
-})
+let autoInstrumentations
+if (!ONLY_WORKFLOW_SPANS) {
+  autoInstrumentations = getNodeAutoInstrumentations({
+    '@opentelemetry/instrumentation-dns': { enabled: false },
+    '@opentelemetry/instrumentation-net': { enabled: false },
+    '@opentelemetry/instrumentation-tls': { enabled: false },
+    '@opentelemetry/instrumentation-fs': { enabled: false },
+    '@opentelemetry/instrumentation-pg': { enabled: false },
+  })
+  registerInstrumentations({ instrumentations: [autoInstrumentations] })
+  console.log(`${LOGPREFIX}: Auto-instrumentations enabled`)
+} else {
+  console.log(`${LOGPREFIX}: TRACING_ONLY_WORKFLOW_SPANS=true -> auto-instrumentations DISABLED (no HTTP/DB spans)`)
+}
 
 // Setup n8n telemetry
 console.log(`${LOGPREFIX}: Setting up n8n telemetry`)
@@ -285,7 +313,7 @@ function setupN8nOpenTelemetry() {
       // rename it so Langfuse trace list shows a workflow-centric name instead of HTTP verb.
       // We detect it heuristically by http.method attribute or name = HTTP verb.
       const activeParent = trace.getSpan(context.active())
-      if (activeParent) {
+      if (activeParent && !ONLY_WORKFLOW_SPANS) {
         const httpMethodAttr =
           activeParent.attributes &&
           (activeParent.attributes['http.method'] ||
@@ -323,16 +351,23 @@ function setupN8nOpenTelemetry() {
       }
 
       // Keep span name constant (low-cardinality) to avoid metrics explosion.
-      const span = tracer.startSpan('n8n.workflow.execute', {
+      const workflowSpanName = buildWorkflowSpanName({
+        workflowId,
+        workflowName,
+        executionId,
+        sessionId,
+      })
+      const span = tracer.startSpan(workflowSpanName, {
         attributes: workflowAttributes,
         kind: SpanKind.INTERNAL,
       })
 
       if (DEBUG) {
-        console.debug(`${LOGPREFIX}: starting n8n workflow (low-cardinality)`, {
+        console.debug(`${LOGPREFIX}: starting n8n workflow span`, {
           workflowId,
           executionId,
           sessionId,
+          spanName: workflowSpanName,
         })
       }
 
