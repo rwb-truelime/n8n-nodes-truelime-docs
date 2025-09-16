@@ -54,6 +54,16 @@ const LOG_LEVEL = getEnv('TRACING_LOG_LEVEL', 'info')
 const DEBUG = LOG_LEVEL === 'debug'
 // If true, disable auto-instrumentations and emit ONLY the manual workflow + node spans.
 const ONLY_WORKFLOW_SPANS = envBool('TRACING_ONLY_WORKFLOW_SPANS', false)
+// Enable adding Langfuse observation type attributes based on node type.
+const MAP_LANGFUSE_OBSERVATION_TYPES = envBool(
+  'TRACING_MAP_LANGFUSE_OBSERVATION_TYPES',
+  true,
+)
+// If true, incorporate observation type into node span name: n8n.node.<type>.execute
+const LANGFUSE_TYPE_IN_NODE_SPAN_NAME = envBool(
+  'TRACING_LANGFUSE_TYPE_IN_NODE_SPAN_NAME',
+  false,
+)
 
 // Toggle dynamic workflow trace naming (otherwise keep low-cardinality constant name)
 const DYNAMIC_WORKFLOW_TRACE_NAME = envBool(
@@ -97,6 +107,32 @@ function buildWorkflowSpanName({
   }
   // Low-cardinality default
   return 'n8n.workflow.execute'
+}
+
+// Heuristic mapping from n8n node type (and sometimes subtype hints) to Langfuse observation type.
+// Reference Langfuse observation types: event | span | generation | agent | tool | chain | retriever | evaluator | embedding | guardrail
+function mapNodeToObservationType(nodeType, nodeAttributes) {
+  if (!nodeType || typeof nodeType !== 'string') return undefined
+  const t = nodeType.toLowerCase()
+
+  // Direct matches / strong signals
+  if (t.includes('agent')) return 'agent'
+  if (t.includes('retriever')) return 'retriever'
+  if (t.includes('embedding')) return 'embedding'
+  if (t.includes('guard') && t.includes('rail')) return 'guardrail'
+  if (t.includes('evaluator') || t.includes('eval')) return 'evaluator'
+
+  // LangChain tool nodes often contain 'tool' or specific provider tool identifiers
+  if (t.includes('tool')) return 'tool'
+
+  // Chat / LLM model nodes -> generation
+  if (t.includes('chatmodel') || t.includes('llm') || t.includes('model')) return 'generation'
+
+  // Chains (LangChain) frequently have 'chain' in type; avoid misclassifying 'blockchain'
+  if (/[^a-z]chain[^a-z]|^chain[^a-z]|[^a-z]chain$/.test(t)) return 'chain'
+
+  // Fallback: basic span type (could also return undefined and skip)
+  return undefined
 }
 
 // Process all OTEL_* environment variables to strip quotes.
@@ -500,8 +536,22 @@ function setupN8nOpenTelemetry() {
         // console.debug(`${LOGPREFIX}: executionData source:`, JSON.stringify(executionData.source))
       }
 
+      // Determine Langfuse observation type (attribute + optional span name decoration)
+      let observationType
+      if (MAP_LANGFUSE_OBSERVATION_TYPES) {
+        observationType = mapNodeToObservationType(node?.type, nodeAttributes)
+        if (observationType) {
+          nodeAttributes['langfuse.observation.type'] = observationType
+          nodeAttributes['n8n.langfuse.observation.type'] = observationType
+        }
+      }
+
+      const nodeSpanName = LANGFUSE_TYPE_IN_NODE_SPAN_NAME && observationType
+        ? `n8n.node.${observationType}.execute`
+        : 'n8n.node.execute'
+
       return tracer.startActiveSpan(
-        `n8n.node.execute`,
+        nodeSpanName,
         { attributes: nodeAttributes, kind: SpanKind.INTERNAL },
         async (nodeSpan) => {
           try {
