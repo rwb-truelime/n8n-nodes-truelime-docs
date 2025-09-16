@@ -73,6 +73,9 @@ const DYNAMIC_WORKFLOW_TRACE_NAME = envBool(
 // Optional explicit pattern overrides boolean flag. Supports placeholders:
 // {workflowId} {workflowName} {executionId} {sessionId}
 const WORKFLOW_SPAN_NAME_PATTERN = process.env.TRACING_WORKFLOW_SPAN_NAME_PATTERN
+// Capture workflow & node input/output content for Langfuse enrichment
+const CAPTURE_IO = envBool('TRACING_CAPTURE_INPUT_OUTPUT', true)
+const MAX_IO_CHARS = parseInt(process.env.TRACING_MAX_IO_CHARS || '12000', 10)
 
 function sanitizeSegment(value, def = 'unknown') {
   if (!value) return def
@@ -109,29 +112,238 @@ function buildWorkflowSpanName({
   return 'n8n.workflow.execute'
 }
 
-// Heuristic mapping from n8n node type (and sometimes subtype hints) to Langfuse observation type.
-// Reference Langfuse observation types: event | span | generation | agent | tool | chain | retriever | evaluator | embedding | guardrail
+// -------------- IO Helper Utilities --------------
+function safeJSONStringify(obj) {
+  try {
+    return JSON.stringify(obj)
+  } catch (e) {
+    return JSON.stringify({ _serializationError: String(e) })
+  }
+}
+
+function truncateIO(str) {
+  if (str == null) return ''
+  if (typeof str !== 'string') str = String(str)
+  if (str.length <= MAX_IO_CHARS) return str
+  return (
+    str.slice(0, MAX_IO_CHARS) + `...[truncated ${str.length - MAX_IO_CHARS} chars]`
+  )
+}
+
+function extractNodeInput(node) {
+  if (!node || typeof node !== 'object') return undefined
+  const params = node.parameters || {}
+  const out = {}
+  const CANDIDATE_KEYS = [
+    'text',
+    'prompt',
+    'input',
+    'query',
+    'question',
+    'messages',
+    'systemMessage',
+    'systemPrompt',
+    'instructions',
+    'url',
+  ]
+  for (const key of CANDIDATE_KEYS) {
+    if (params[key] !== undefined) out[key] = params[key]
+    if (params.options && params.options[key] !== undefined) {
+      out[`options.${key}`] = params.options[key]
+    }
+  }
+  // fallback: include small primitive params
+  if (!Object.keys(out).length) {
+    for (const [k, v] of Object.entries(params)) {
+      if (typeof v === 'string' && v.length < 400) out[k] = v
+      else if (typeof v === 'number' || typeof v === 'boolean') out[k] = v
+    }
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
+function extractNodeOutput(result, runIndex) {
+  try {
+    const outputData = result?.data?.[runIndex]
+    if (!outputData) return undefined
+    const jsonArray = outputData.map((item) => item.json)
+    if (!jsonArray?.length) return undefined
+    const first = jsonArray[0]
+    let primary
+    if (first && typeof first === 'object') {
+      primary =
+        first.output ||
+        first.completion ||
+        first.text ||
+        first.result ||
+        first.response ||
+        undefined
+    }
+    return { primary, items: jsonArray.slice(0, 10) } // limit items for size
+  } catch (e) {
+    return { _error: String(e) }
+  }
+}
+
+// Layered classifier for mapping n8n node types -> Langfuse observation types.
+// Priority: exact sets > regex heuristics > category fallback (provided at call site if needed) > undefined
+// Final fallback (handled later) becomes 'span'.
+const OBS_TYPES = Object.freeze([
+  'agent',
+  'tool',
+  'chain',
+  'retriever',
+  'generation',
+  'embedding',
+  'evaluator',
+  'guardrail',
+  'event',
+  'span',
+])
+
+const EXACT_SETS = {
+  agent: new Set(['Agent', 'AgentTool']),
+  // LLM / generation
+  generation: new Set([
+    'LmChatOpenAi',
+    'LmOpenAi',
+    'OpenAi',
+    'Anthropic',
+    'GoogleGemini',
+    'Groq',
+    'Perplexity',
+    'LmChatAnthropic',
+    'LmChatGoogleGemini',
+    'LmChatMistralCloud',
+    'LmChatOpenRouter',
+    'LmChatXAiGrok',
+    'OpenAiAssistant',
+  ]),
+  embedding: new Set([
+    'EmbeddingsAwsBedrock',
+    'EmbeddingsAzureOpenAi',
+    'EmbeddingsCohere',
+    'EmbeddingsGoogleGemini',
+    'EmbeddingsGoogleVertex',
+    'EmbeddingsHuggingFaceInference',
+    'EmbeddingsMistralCloud',
+    'EmbeddingsOllama',
+    'EmbeddingsOpenAi',
+  ]),
+  retriever: new Set([
+    'RetrieverContextualCompression',
+    'RetrieverMultiQuery',
+    'RetrieverVectorStore',
+    'RetrieverWorkflow',
+    'MemoryChatRetriever',
+    'VectorStoreInMemory',
+    'VectorStoreInMemoryInsert',
+    'VectorStoreInMemoryLoad',
+    'VectorStoreMilvus',
+    'VectorStoreMongoDBAtlas',
+    'VectorStorePGVector',
+    'VectorStorePinecone',
+    'VectorStorePineconeInsert',
+    'VectorStorePineconeLoad',
+    'VectorStoreQdrant',
+    'VectorStoreSupabase',
+    'VectorStoreSupabaseInsert',
+    'VectorStoreSupabaseLoad',
+    'VectorStoreWeaviate',
+    'VectorStoreZep',
+    'VectorStoreZepInsert',
+    'VectorStoreZepLoad',
+  ]),
+  evaluator: new Set([
+    'SentimentAnalysis',
+    'TextClassifier',
+    'InformationExtractor',
+    'RerankerCohere',
+    'OutputParserAutofixing',
+  ]),
+  guardrail: new Set(['GooglePerspective', 'AwsRekognition']),
+  chain: new Set([
+    'ChainLlm',
+    'ChainRetrievalQa',
+    'ChainSummarization',
+    'ToolWorkflow',
+    'ToolExecutor',
+    'ModelSelector',
+    'OutputParserStructured',
+    'OutputParserItemList',
+    'OutputParserAutofixing',
+    'TextSplitterCharacterTextSplitter',
+    'TextSplitterRecursiveCharacterTextSplitter',
+    'TextSplitterTokenSplitter',
+    'ToolThink',
+  ]),
+}
+
+// Regex / contains heuristics (ordered)
+const REGEX_RULES = [
+  { type: 'agent', pattern: /agent/i },
+  { type: 'embedding', pattern: /embedding/i },
+  { type: 'retriever', pattern: /(retriev|vectorstore)/i },
+  { type: 'generation', pattern: /(lmchat|^lm[a-z]|chat|openai|anthropic|gemini|mistral|groq|cohere)/i },
+  { type: 'tool', pattern: /tool/ },
+  { type: 'chain', pattern: /(chain|textsplitter|parser|memory|workflow)/i },
+  { type: 'evaluator', pattern: /(rerank|classif|sentiment|extract)/i },
+  { type: 'guardrail', pattern: /(perspective|rekognition|moderation|guardrail)/i },
+]
+
+// Internal logic / orchestration nodes we treat as chain if otherwise unmatched (Core category)
+const INTERNAL_LOGIC = new Set([
+  'If',
+  'Switch',
+  'Set',
+  'Move',
+  'Rename',
+  'Wait',
+  'WaitUntil',
+  'Function',
+  'FunctionItem',
+  'Code',
+  'NoOp',
+  'ExecuteWorkflow',
+  'SubworkflowTo',
+])
+
+// Category-based fallback mapping (lower priority than exact + regex)
+function categoryFallback(type, category) {
+  switch (category) {
+    case 'Trigger Nodes':
+      return 'event'
+    case 'Transform Nodes':
+      return 'chain'
+    case 'AI/LangChain Nodes':
+      return 'chain'
+    case 'Core Nodes': {
+      if (INTERNAL_LOGIC.has(type)) return 'chain'
+      if (type === 'Schedule' || type === 'Cron') return 'event'
+      return 'tool'
+    }
+    default:
+      return undefined
+  }
+}
+
 function mapNodeToObservationType(nodeType, nodeAttributes) {
   if (!nodeType || typeof nodeType !== 'string') return undefined
-  const t = nodeType.toLowerCase()
-
-  // Direct matches / strong signals
-  if (t.includes('agent')) return 'agent'
-  if (t.includes('retriever')) return 'retriever'
-  if (t.includes('embedding')) return 'embedding'
-  if (t.includes('guard') && t.includes('rail')) return 'guardrail'
-  if (t.includes('evaluator') || t.includes('eval')) return 'evaluator'
-
-  // LangChain tool nodes often contain 'tool' or specific provider tool identifiers
-  if (t.includes('tool')) return 'tool'
-
-  // Chat / LLM model nodes -> generation
-  if (t.includes('chatmodel') || t.includes('llm') || t.includes('model')) return 'generation'
-
-  // Chains (LangChain) frequently have 'chain' in type; avoid misclassifying 'blockchain'
-  if (/[^a-z]chain[^a-z]|^chain[^a-z]|[^a-z]chain$/.test(t)) return 'chain'
-
-  // Fallback: basic span type (could also return undefined and skip)
+  const original = nodeType
+  // 1. Exact sets
+  for (const [obsType, set] of Object.entries(EXACT_SETS)) {
+    if (set.has(original)) return obsType
+  }
+  // 2. Regex heuristics
+  const lower = original.toLowerCase()
+  for (const rule of REGEX_RULES) {
+    if (rule.pattern.test(lower)) return rule.type
+  }
+  // 3. Category fallback if we have category info in nodeAttributes
+  const category = nodeAttributes?.['n8n.node.category'] || nodeAttributes?.['n8n.node.category_raw']
+  const fromCategory = categoryFallback(original, category)
+  if (fromCategory) return fromCategory
+  // 4. No match -> undefined (caller will default to span)
   return undefined
 }
 
@@ -421,6 +633,26 @@ function setupN8nOpenTelemetry() {
                   message: String(err.message || err),
                 })
               }
+              if (CAPTURE_IO) {
+                // Workflow output (trace output)
+                try {
+                  const runData = result?.data?.resultData?.runData
+                  if (runData) {
+                    const outputStr = truncateIO(safeJSONStringify(runData))
+                    span.setAttribute('langfuse.trace.output', outputStr)
+                  }
+                } catch (e) {
+                  if (DEBUG)
+                    console.warn('[Tracing] Failed to capture workflow output', e)
+                }
+                // If no explicit trace input yet, set minimal context
+                if (!span.attributes?.['langfuse.trace.input']) {
+                  span.setAttribute(
+                    'langfuse.trace.input',
+                    safeJSONStringify({ workflowId, workflowName }),
+                  )
+                }
+              }
             },
             (error) => {
               span.recordException(error)
@@ -554,6 +786,21 @@ function setupN8nOpenTelemetry() {
         nodeSpanName,
         { attributes: nodeAttributes, kind: SpanKind.INTERNAL },
         async (nodeSpan) => {
+          // Capture node input *before* execution
+          if (CAPTURE_IO) {
+            try {
+              const inputObj = extractNodeInput(node)
+              if (inputObj) {
+                const inputStr = truncateIO(safeJSONStringify(inputObj))
+                nodeSpan.setAttribute('langfuse.observation.input', inputStr)
+                // Secondary semantic attribute for GenAI tooling
+                nodeSpan.setAttribute('gen_ai.prompt', inputStr)
+              }
+            } catch (e) {
+              if (DEBUG)
+                console.warn('[Tracing] Failed to capture node input', e)
+            }
+          }
           try {
             const result = await originalRunNode.apply(this, [
               workflow,
@@ -571,6 +818,17 @@ function setupN8nOpenTelemetry() {
                 'n8n.node.output_json',
                 JSON.stringify(finalJson),
               )
+              if (CAPTURE_IO) {
+                const extracted = extractNodeOutput(result, runIndex)
+                if (extracted) {
+                  const outputStr = truncateIO(safeJSONStringify(extracted))
+                  nodeSpan.setAttribute(
+                    'langfuse.observation.output',
+                    outputStr,
+                  )
+                  nodeSpan.setAttribute('gen_ai.completion', outputStr)
+                }
+              }
             } catch (error) {
               console.warn('Failed to set node output attributes: ', error)
             }
