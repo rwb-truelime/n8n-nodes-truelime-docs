@@ -64,6 +64,8 @@ const LANGFUSE_TYPE_IN_NODE_SPAN_NAME = envBool(
   'TRACING_LANGFUSE_TYPE_IN_NODE_SPAN_NAME',
   false,
 )
+// If true, span name for nodes becomes the actual n8n node name (higher cardinality but more readable)
+const USE_NODE_NAME_SPAN = envBool('TRACING_USE_NODE_NAME_SPAN', true)
 
 // Toggle dynamic workflow trace naming (otherwise keep low-cardinality constant name)
 const DYNAMIC_WORKFLOW_TRACE_NAME = envBool(
@@ -778,9 +780,15 @@ function setupN8nOpenTelemetry() {
         }
       }
 
-      const nodeSpanName = LANGFUSE_TYPE_IN_NODE_SPAN_NAME && observationType
-        ? `n8n.node.${observationType}.execute`
-        : 'n8n.node.execute'
+      let nodeSpanName
+      if (USE_NODE_NAME_SPAN) {
+        // Use raw node name for maximum readability; fall back if missing
+        nodeSpanName = node?.name || 'unknown-node'
+      } else if (LANGFUSE_TYPE_IN_NODE_SPAN_NAME && observationType) {
+        nodeSpanName = `n8n.node.${observationType}.execute`
+      } else {
+        nodeSpanName = 'n8n.node.execute'
+      }
 
       return tracer.startActiveSpan(
         nodeSpanName,
