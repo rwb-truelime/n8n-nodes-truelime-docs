@@ -12,6 +12,29 @@
  * TODO: add subnode instrumentation.
  */
 
+// Guard against multiple initializations (n8n might load this module multiple times)
+// Use multiple methods for maximum reliability across different Node.js contexts
+const ALREADY_INITIALIZED =
+  global.__n8nTracingInitialized ||
+  process.env.__N8N_TRACING_INITIALIZED === 'true' ||
+  process.__n8nOtelSDKStarted;
+
+if (ALREADY_INITIALIZED) {
+  console.log(`[Tracing]: Already initialized in this process (PID: ${process.pid}), skipping duplicate initialization`)
+  module.exports = {}; // Export empty object and exit
+} else {
+  // Mark as initialized using multiple methods for different contexts
+  global.__n8nTracingInitialized = true;
+  process.env.__N8N_TRACING_INITIALIZED = 'true';
+  process.__n8nOtelSDKStarted = true;
+  console.log(`[Tracing]: First initialization in process (PID: ${process.pid}, PPID: ${process.ppid || 'unknown'})`)
+
+  // Proceed with initialization
+  initializeTracing();
+}
+
+function initializeTracing() {
+
 const opentelemetry = require('@opentelemetry/sdk-node')
 const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-http')
 const { OTLPLogExporter } = require('@opentelemetry/exporter-logs-otlp-http')
@@ -32,6 +55,7 @@ const {
 } = require('@opentelemetry/api')
 const { flatten } = require('flat') // flattens objects into a single level
 const { envDetector, hostDetector, processDetector } = require('@opentelemetry/resources')
+const { mapNodeToObservationType } = require('./langfuse-type-mapper')
 
 // Helper to parse boolean env vars
 function envBool(name, def = false) {
@@ -134,20 +158,20 @@ function truncateIO(str) {
 
 function extractNodeInput(node) {
   if (!node || typeof node !== 'object') return undefined
-  const params = node.parameters || {}
+      const params = node.parameters || {}
   const out = {}
   const CANDIDATE_KEYS = [
     'text',
-    'prompt',
-    'input',
+        'prompt',
+        'input',
     'query',
     'question',
     'messages',
-    'systemMessage',
+        'systemMessage',
     'systemPrompt',
     'instructions',
     'url',
-  ]
+      ]
   for (const key of CANDIDATE_KEYS) {
     if (params[key] !== undefined) out[key] = params[key]
     if (params.options && params.options[key] !== undefined) {
@@ -172,7 +196,7 @@ function extractNodeOutput(result, runIndex) {
     if (!jsonArray?.length) return undefined
     const first = jsonArray[0]
     let primary
-    if (first && typeof first === 'object') {
+      if (first && typeof first === 'object') {
       primary =
         first.output ||
         first.completion ||
@@ -188,166 +212,9 @@ function extractNodeOutput(result, runIndex) {
 }
 
 // Layered classifier for mapping n8n node types -> Langfuse observation types.
-// Priority: exact sets > regex heuristics > category fallback (provided at call site if needed) > undefined
-// Final fallback (handled later) becomes 'span'.
-const OBS_TYPES = Object.freeze([
-  'agent',
-  'tool',
-  'chain',
-  'retriever',
-  'generation',
-  'embedding',
-  'evaluator',
-  'guardrail',
-  'event',
-  'span',
-])
-
-const EXACT_SETS = {
-  agent: new Set(['Agent', 'AgentTool']),
-  // LLM / generation
-  generation: new Set([
-    'LmChatOpenAi',
-    'LmOpenAi',
-    'OpenAi',
-    'Anthropic',
-    'GoogleGemini',
-    'Groq',
-    'Perplexity',
-    'LmChatAnthropic',
-    'LmChatGoogleGemini',
-    'LmChatMistralCloud',
-    'LmChatOpenRouter',
-    'LmChatXAiGrok',
-    'OpenAiAssistant',
-  ]),
-  embedding: new Set([
-    'EmbeddingsAwsBedrock',
-    'EmbeddingsAzureOpenAi',
-    'EmbeddingsCohere',
-    'EmbeddingsGoogleGemini',
-    'EmbeddingsGoogleVertex',
-    'EmbeddingsHuggingFaceInference',
-    'EmbeddingsMistralCloud',
-    'EmbeddingsOllama',
-    'EmbeddingsOpenAi',
-  ]),
-  retriever: new Set([
-    'RetrieverContextualCompression',
-    'RetrieverMultiQuery',
-    'RetrieverVectorStore',
-    'RetrieverWorkflow',
-    'MemoryChatRetriever',
-    'VectorStoreInMemory',
-    'VectorStoreInMemoryInsert',
-    'VectorStoreInMemoryLoad',
-    'VectorStoreMilvus',
-    'VectorStoreMongoDBAtlas',
-    'VectorStorePGVector',
-    'VectorStorePinecone',
-    'VectorStorePineconeInsert',
-    'VectorStorePineconeLoad',
-    'VectorStoreQdrant',
-    'VectorStoreSupabase',
-    'VectorStoreSupabaseInsert',
-    'VectorStoreSupabaseLoad',
-    'VectorStoreWeaviate',
-    'VectorStoreZep',
-    'VectorStoreZepInsert',
-    'VectorStoreZepLoad',
-  ]),
-  evaluator: new Set([
-    'SentimentAnalysis',
-    'TextClassifier',
-    'InformationExtractor',
-    'RerankerCohere',
-    'OutputParserAutofixing',
-  ]),
-  guardrail: new Set(['GooglePerspective', 'AwsRekognition']),
-  chain: new Set([
-    'ChainLlm',
-    'ChainRetrievalQa',
-    'ChainSummarization',
-    'ToolWorkflow',
-    'ToolExecutor',
-    'ModelSelector',
-    'OutputParserStructured',
-    'OutputParserItemList',
-    'OutputParserAutofixing',
-    'TextSplitterCharacterTextSplitter',
-    'TextSplitterRecursiveCharacterTextSplitter',
-    'TextSplitterTokenSplitter',
-    'ToolThink',
-  ]),
-}
-
-// Regex / contains heuristics (ordered)
-const REGEX_RULES = [
-  { type: 'agent', pattern: /agent/i },
-  { type: 'embedding', pattern: /embedding/i },
-  { type: 'retriever', pattern: /(retriev|vectorstore)/i },
-  { type: 'generation', pattern: /(lmchat|^lm[a-z]|chat|openai|anthropic|gemini|mistral|groq|cohere)/i },
-  { type: 'tool', pattern: /tool/ },
-  { type: 'chain', pattern: /(chain|textsplitter|parser|memory|workflow)/i },
-  { type: 'evaluator', pattern: /(rerank|classif|sentiment|extract)/i },
-  { type: 'guardrail', pattern: /(perspective|rekognition|moderation|guardrail)/i },
-]
-
-// Internal logic / orchestration nodes we treat as chain if otherwise unmatched (Core category)
-const INTERNAL_LOGIC = new Set([
-  'If',
-  'Switch',
-  'Set',
-  'Move',
-  'Rename',
-  'Wait',
-  'WaitUntil',
-  'Function',
-  'FunctionItem',
-  'Code',
-  'NoOp',
-  'ExecuteWorkflow',
-  'SubworkflowTo',
-])
-
-// Category-based fallback mapping (lower priority than exact + regex)
-function categoryFallback(type, category) {
-  switch (category) {
-    case 'Trigger Nodes':
-      return 'event'
-    case 'Transform Nodes':
-      return 'chain'
-    case 'AI/LangChain Nodes':
-      return 'chain'
-    case 'Core Nodes': {
-      if (INTERNAL_LOGIC.has(type)) return 'chain'
-      if (type === 'Schedule' || type === 'Cron') return 'event'
-      return 'tool'
-    }
-    default:
-      return undefined
-  }
-}
-
-function mapNodeToObservationType(nodeType, nodeAttributes) {
-  if (!nodeType || typeof nodeType !== 'string') return undefined
-  const original = nodeType
-  // 1. Exact sets
-  for (const [obsType, set] of Object.entries(EXACT_SETS)) {
-    if (set.has(original)) return obsType
-  }
-  // 2. Regex heuristics
-  const lower = original.toLowerCase()
-  for (const rule of REGEX_RULES) {
-    if (rule.pattern.test(lower)) return rule.type
-  }
-  // 3. Category fallback if we have category info in nodeAttributes
-  const category = nodeAttributes?.['n8n.node.category'] || nodeAttributes?.['n8n.node.category_raw']
-  const fromCategory = categoryFallback(original, category)
-  if (fromCategory) return fromCategory
-  // 4. No match -> undefined (caller will default to span)
-  return undefined
-}
+// Priority mapping logic is provided by the standalone module `langfuse-type-mapper.js`.
+// We intentionally keep only the import above to avoid duplicate definitions that caused
+// "Identifier 'mapNodeToObservationType' has already been declared" runtime errors.
 
 // Process all OTEL_* environment variables to strip quotes.
 // Fixes issues with quotes in Docker env vars breaking the OTLP exporter.
@@ -387,6 +254,18 @@ console.log(
 const sdk = setupOpenTelemetryNodeSDK()
 
 sdk.start()
+console.log(`${LOGPREFIX}: OpenTelemetry SDK started successfully`)
+
+// Add warning handler for OTLP export timeouts (non-critical)
+process.on('warning', (warning) => {
+  if (warning.name === 'ExperimentalWarning') return; // Ignore experimental warnings
+  if (warning.message && warning.message.includes('Request Timeout')) {
+    console.warn(`${LOGPREFIX}: OTLP export timeout (non-critical) - telemetry data may be delayed`)
+    if (DEBUG) {
+      console.warn(`${LOGPREFIX}: OTLP timeout details:`, warning.message)
+    }
+  }
+})
 
 // Helper: derive a session id. For now we treat each execution as its own session.
 function deriveSessionId(executionId) {
@@ -431,6 +310,18 @@ function processOtelEnvironmentVariables() {
       }
     }
   }
+
+  // Set reasonable defaults for OTLP timeouts if not configured
+  if (!process.env.OTEL_EXPORTER_OTLP_TIMEOUT && !process.env.OTEL_EXPORTER_OTLP_TRACES_TIMEOUT) {
+    process.env.OTEL_EXPORTER_OTLP_TIMEOUT = '30000' // 30 seconds instead of default 10
+    console.log(`${LOGPREFIX}: Set default OTLP timeout to 30 seconds`)
+  }
+
+  // Set batch export timeout if not configured
+  if (!process.env.OTEL_BSP_EXPORT_TIMEOUT) {
+    process.env.OTEL_BSP_EXPORT_TIMEOUT = '30000' // 30 seconds for batch span processor
+    console.log(`${LOGPREFIX}: Set default batch export timeout to 30 seconds`)
+  }
 }
 
 function awaitAttributes(detector) {
@@ -459,6 +350,15 @@ function setupOpenTelemetryNodeSDK() {
       [SEMRESATTRS_SERVICE_NAME]: getEnv('OTEL_SERVICE_NAME', 'n8n'),
     }),
     traceExporter: new OTLPTraceExporter(),
+  }
+
+  // Log OTLP configuration for debugging
+  const otlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT || process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT || 'default';
+  const otlpTimeout = process.env.OTEL_EXPORTER_OTLP_TIMEOUT || process.env.OTEL_EXPORTER_OTLP_TRACES_TIMEOUT || '10000';
+  console.log(`${LOGPREFIX}: OTLP Endpoint: ${otlpEndpoint}`)
+  console.log(`${LOGPREFIX}: OTLP Timeout: ${otlpTimeout}ms`)
+  if (DEBUG) {
+    console.log(`${LOGPREFIX}: OTLP Headers configured: ${process.env.OTEL_EXPORTER_OTLP_HEADERS ? 'Yes' : 'No'}`)
   }
 
   if (shouldEnableOtelLogs()) {
@@ -857,5 +757,6 @@ function setupN8nOpenTelemetry() {
     }
   } catch (e) {
     console.error('Failed to set up n8n OpenTelemetry instrumentation:', e)
-  }
+  	}
+	}
 }
