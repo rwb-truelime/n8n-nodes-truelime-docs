@@ -13,7 +13,11 @@ fi
 
 if [ "${OTEL_SDK_DISABLED}" = "false" ]; then
   echo "Starting n8n with OpenTelemetry instrumentation..."
-  export NODE_PATH="/opt/opentelemetry/node_modules:/usr/local/lib/node_modules:${NODE_PATH}"
+  # Ensure n8n's own nested dependencies (like n8n-workflow) are resolvable.
+  # These live under the n8n package's internal node_modules folder.
+  export NODE_PATH="/opt/opentelemetry/node_modules:/usr/local/lib/node_modules/n8n/node_modules:/usr/local/lib/node_modules:${NODE_PATH}"
+  # Debug (optional): uncomment to verify resolution
+  # echo "NODE_PATH=$NODE_PATH"
   exec node --require /opt/opentelemetry/tracing.js /usr/local/bin/n8n "$@"
 else
   echo "OpenTelemetry disabled, starting n8n normally..."
