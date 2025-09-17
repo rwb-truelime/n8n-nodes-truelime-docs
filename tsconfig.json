@@ -27,4 +27,5 @@
 		"nodes/**/*.json",
 		"package.json",
 	],
+	"ignorePatterns": ["tracing/package.json"],
 }
