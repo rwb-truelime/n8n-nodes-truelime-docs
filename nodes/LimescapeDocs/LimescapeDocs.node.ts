@@ -5,7 +5,6 @@ import {
   INodeExecutionData,
   IDataObject,
   NodeOperationError,
-	NodeConnectionType,
   IBinaryData,
 } from 'n8n-workflow';
 import { zerox, ZeroxArgs, ModelCredentials, ErrorMode as ZeroxErrorMode, ModelProvider as ZeroxModelProvider } from 'limescape-docs-processor';
@@ -50,15 +49,15 @@ export class LimescapeDocs implements INodeType {
       },
       // eslint-disable-next-line n8n-nodes-base/node-class-description-inputs-wrong-regular-node
       inputs: [
-				{
-						displayName: 'Input Data',
-						type: NodeConnectionType.Main,
-						required: true
-				}
-		],
+                {
+                        displayName: 'Input Data',
+                        type: 'main',
+                        required: true
+                }
+        ],
       // Define only the main success output
       // eslint-disable-next-line n8n-nodes-base/node-class-description-outputs-wrong
-      outputs: [ { type: NodeConnectionType.Main } ],
+    outputs: [ { type: 'main' } ],
       credentials: [
           {
               name: 'limescapeDocsApi',
