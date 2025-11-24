@@ -3,7 +3,7 @@ import { ICredentialType, INodeProperties } from 'n8n-workflow';
 export class LimescapeDocsApi implements ICredentialType {
     name = 'limescapeDocsApi';
     displayName = 'Limescape Docs Credentials API';
-    documentationUrl = 'https://github.com/truelime-dev/zerox-truelime';
+    documentationUrl = 'https://dev.azure.com/truelime/Team%20AI/_git/limescape-ai-limescape-docs';
     properties: INodeProperties[] = [
         // OpenAI
         {

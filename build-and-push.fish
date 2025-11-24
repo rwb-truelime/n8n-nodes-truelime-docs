@@ -44,6 +44,10 @@ function run_step
         echo "---- output ----"
         cat $log
         echo "----------------"
+        if test "$IGNORE_ERRORS" != "true"
+            rm -f $log $codefile
+            exit $code
+        end
     end
     rm -f $log $codefile
     return $code
@@ -120,6 +124,11 @@ function resolve_n8n_version
     exit 1
 end
 
+set IGNORE_ERRORS "false"
+if contains -- --ignore-errors $argv
+    set IGNORE_ERRORS "true"
+end
+
 echo
 set_color red
 echo '  ███╗   ██╗███╗   ██╗██╗███╗   ███╗'
@@ -193,7 +202,10 @@ function push_image
     end
     # Suppress verbose docker output; logs are available in $log if needed.
     rm -f $log $codefile
-    exit $code
+    if test "$IGNORE_ERRORS" != "true"
+        exit $code
+    end
+    return $code
 end
 
 push_image tlteamai.azurecr.io/n8n/truelime-n8n:$N8N_VERSION

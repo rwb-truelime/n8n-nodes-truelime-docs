@@ -7,7 +7,14 @@ import {
   NodeOperationError,
   IBinaryData,
 } from 'n8n-workflow';
-import { zerox, ZeroxArgs, ModelCredentials, ErrorMode as ZeroxErrorMode, ModelProvider as ZeroxModelProvider } from 'limescape-docs-processor';
+import {
+    limescapeDocs,
+    LimescapeDocsArgs,
+    ModelCredentials,
+    ErrorMode as LimescapeErrorMode,
+    ModelProvider as LimescapeModelProvider,
+    LLMParams,
+} from 'limescape-docs';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -23,15 +30,285 @@ const ensureDirSync = (dirPath: string) => {
   }
 };
 
-// Helper to parse comma-separated numbers/ranges (implement robustly if needed)
-const parsePages = (pagesStr: string | undefined): number[] | number | undefined => {
-  if (!pagesStr) return undefined;
-  // Basic parsing - enhance for ranges (e.g., "1,3-5,7") if required by zerox
-  const parts = pagesStr.split(',').map(p => p.trim()).filter(p => p);
-  const numbers = parts.map(p => parseInt(p, 10)).filter(n => !isNaN(n));
-  if (numbers.length === 0) return undefined; // Explicit return
-  if (numbers.length === 1) return numbers[0];
-  return numbers; // Explicit return
+// Helper to parse comma-separated numbers/ranges into page numbers
+const parsePages = (pagesStr: string | undefined): number[] | undefined => {
+    if (!pagesStr) return undefined;
+
+    const result: number[] = [];
+    const parts = pagesStr
+        .split(',')
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
+
+    for (const part of parts) {
+        if (part.includes('-')) {
+            const [startStr, endStr] = part.split('-').map((v) => v.trim());
+            const start = Number(startStr);
+            const end = Number(endStr);
+            if (!Number.isNaN(start) && !Number.isNaN(end) && start > 0 && end >= start) {
+                for (let i = start; i <= end; i++) {
+                    result.push(i);
+                }
+            }
+        } else {
+            const value = Number(part);
+            if (!Number.isNaN(value) && value > 0) {
+                result.push(value);
+            }
+        }
+    }
+
+    return result.length > 0 ? result : undefined;
+};
+
+// Helper to build LLM params from n8n collection input
+const buildLLMParams = (input: IDataObject): Partial<LLMParams> => {
+    const params: Partial<Record<string, unknown>> = {};
+
+    if (input.temperature !== undefined && input.temperature !== null && input.temperature !== '') {
+        params.temperature = Number(input.temperature);
+    }
+    if (input.topP !== undefined && input.topP !== null && input.topP !== '') {
+        params.topP = Number(input.topP);
+    }
+    if (input.frequencyPenalty !== undefined && input.frequencyPenalty !== null && input.frequencyPenalty !== '') {
+        params.frequencyPenalty = Number(input.frequencyPenalty);
+    }
+    if (input.presencePenalty !== undefined && input.presencePenalty !== null && input.presencePenalty !== '') {
+        params.presencePenalty = Number(input.presencePenalty);
+    }
+    if (input.maxTokens !== undefined && input.maxTokens !== null && input.maxTokens !== '') {
+        params.maxTokens = Number(input.maxTokens);
+    }
+    if (input.maxOutputTokens !== undefined && input.maxOutputTokens !== null && input.maxOutputTokens !== '') {
+        params.maxOutputTokens = Number(input.maxOutputTokens);
+    }
+    if (input.logprobs !== undefined && input.logprobs !== null && input.logprobs !== '') {
+        params.logprobs = Boolean(input.logprobs);
+    }
+    return params as Partial<LLMParams>;
+    return params;
+};
+
+// Helper to parse schema once from node parameter
+const parseSchema = (
+    node: IExecuteFunctions,
+    rawSchema: string | object | undefined,
+): Record<string, unknown> | undefined => {
+    if (!rawSchema) return undefined;
+
+    let schema: unknown = rawSchema;
+
+    if (typeof rawSchema === 'string') {
+        const trimmed = rawSchema.trim();
+        if (trimmed === '' || trimmed === '{}') return undefined;
+        try {
+            schema = JSON.parse(trimmed);
+        } catch (error) {
+            throw new NodeOperationError(
+                node.getNode(),
+                `Invalid JSON schema provided: ${error instanceof Error ? error.message : String(error)}`,
+                { itemIndex: -1 },
+            );
+        }
+    }
+
+    if (typeof schema !== 'object' || schema === null) {
+        return undefined;
+    }
+
+    return schema as Record<string, unknown>;
+};
+
+// Helper to map n8n credentials to library ModelCredentials
+const mapCredentialsForProvider = (
+    node: IExecuteFunctions,
+    provider: LimescapeModelProvider,
+    credentials: IDataObject,
+): ModelCredentials => {
+    if (provider === LimescapeModelProvider.OPENAI) {
+        if (!credentials.openaiApiKey) {
+            throw new NodeOperationError(node.getNode(), 'OpenAI API Key is required when using OpenAI as the provider.', {
+                itemIndex: -1,
+            });
+        }
+        return {
+            apiKey: credentials.openaiApiKey as string,
+        };
+    }
+
+    if (provider === LimescapeModelProvider.AZURE) {
+        if (!credentials.azureApiKey || !credentials.azureEndpoint) {
+            throw new NodeOperationError(
+                node.getNode(),
+                'Azure API Key and Azure Endpoint are required when using Azure as the provider.',
+                { itemIndex: -1 },
+            );
+        }
+        return {
+            apiKey: credentials.azureApiKey as string,
+            endpoint: credentials.azureEndpoint as string,
+            azureApiVersion: (credentials.azureApiVersion as string | undefined) || undefined,
+        } as ModelCredentials;
+    }
+
+    if (provider === LimescapeModelProvider.AZURE_AIF) {
+        if (!credentials.azureAifApiKey || !credentials.azureAifBaseURL) {
+            throw new NodeOperationError(
+                node.getNode(),
+                'Azure AI Foundry API Key and Base URL are required when using Azure AI Foundry as the provider.',
+                { itemIndex: -1 },
+            );
+        }
+        return {
+            apiKey: credentials.azureAifApiKey as string,
+            baseURL: credentials.azureAifBaseURL as string,
+        } as ModelCredentials;
+    }
+
+    if (provider === LimescapeModelProvider.GOOGLE) {
+        if (!credentials.googleApiKey) {
+            throw new NodeOperationError(node.getNode(), 'Google API Key is required when using Google as the provider.', {
+                itemIndex: -1,
+            });
+        }
+        return {
+            apiKey: credentials.googleApiKey as string,
+        } as ModelCredentials;
+    }
+
+    if (provider === LimescapeModelProvider.VERTEX) {
+        if (!credentials.vertexServiceAccount || !credentials.vertexLocation) {
+            throw new NodeOperationError(
+                node.getNode(),
+                'Vertex AI Service Account and Location are required when using Google Vertex as the provider.',
+                { itemIndex: -1 },
+            );
+        }
+        return {
+            serviceAccount: credentials.vertexServiceAccount as string,
+            location: credentials.vertexLocation as string,
+        } as ModelCredentials;
+    }
+
+    if (provider === LimescapeModelProvider.BEDROCK) {
+        if (!credentials.bedrockAccessKeyId || !credentials.bedrockSecretAccessKey || !credentials.bedrockRegion) {
+            throw new NodeOperationError(
+                node.getNode(),
+                'AWS Bedrock Access Key ID, Secret Key, and Region are required when using AWS Bedrock as the provider.',
+                { itemIndex: -1 },
+            );
+        }
+        return {
+            accessKeyId: credentials.bedrockAccessKeyId as string,
+            secretAccessKey: credentials.bedrockSecretAccessKey as string,
+            region: credentials.bedrockRegion as string,
+            sessionToken: (credentials.bedrockSessionToken as string | undefined) || undefined,
+        } as ModelCredentials;
+    }
+
+    throw new NodeOperationError(node.getNode(), `Unsupported provider type in mapCredentialsForProvider: ${provider}`, {
+        itemIndex: -1,
+    });
+};
+
+interface BuildArgsInput {
+    filePath: string;
+    modelProvider: LimescapeModelProvider;
+    model: string;
+    schema?: Record<string, unknown>;
+    processingOptions: IDataObject;
+    extractionOptions: IDataObject;
+    llmParams: Partial<LLMParams>;
+    extractionLlmParams: Partial<LLMParams>;
+    baseCredentials: ModelCredentials;
+    baseExtractionCredentials?: ModelCredentials;
+}
+
+const buildLimescapeArgsForItem = (input: BuildArgsInput): LimescapeDocsArgs => {
+    const {
+        filePath,
+        modelProvider,
+        model,
+        schema,
+        processingOptions,
+        extractionOptions,
+        llmParams,
+        extractionLlmParams,
+        baseCredentials,
+        baseExtractionCredentials,
+    } = input;
+
+    const args: LimescapeDocsArgs = {
+        filePath,
+        modelProvider,
+        model,
+        credentials: baseCredentials,
+    } as LimescapeDocsArgs;
+
+    if (schema) {
+        args.schema = schema;
+    }
+
+    // Processing options
+    const po = processingOptions;
+    if (po.outputDir) args.outputDir = po.outputDir as string;
+    if (po.tempDir) args.tempDir = po.tempDir as string;
+    if (po.cleanup !== undefined) args.cleanup = po.cleanup as boolean;
+    if (po.concurrency !== undefined) args.concurrency = Number(po.concurrency);
+    if (po.correctOrientation !== undefined) args.correctOrientation = po.correctOrientation as boolean;
+    if (po.directImageExtraction !== undefined) args.directImageExtraction = po.directImageExtraction as boolean;
+    if (po.enableHybridExtraction !== undefined) args.enableHybridExtraction = po.enableHybridExtraction as boolean;
+    if (po.extractOnly !== undefined) args.extractOnly = po.extractOnly as boolean;
+    if (po.imageDensity !== undefined) args.imageDensity = Number(po.imageDensity);
+    if (po.imageHeight !== undefined) args.imageHeight = Number(po.imageHeight);
+    if (po.imageFormat) args.imageFormat = po.imageFormat as 'png' | 'jpeg';
+    if (po.maintainFormat !== undefined) args.maintainFormat = po.maintainFormat as boolean;
+    if (po.maxImageSize !== undefined) args.maxImageSize = Number(po.maxImageSize);
+    if (po.maxRetries !== undefined) args.maxRetries = Number(po.maxRetries);
+    if (po.maxTesseractWorkers !== undefined) args.maxTesseractWorkers = Number(po.maxTesseractWorkers);
+    if (po.prompt) args.prompt = po.prompt as string;
+    if (po.trimEdges !== undefined) args.trimEdges = po.trimEdges as boolean;
+
+    const pagesToConvert = parsePages(po.pagesToConvertAsImages as string | undefined);
+    if (pagesToConvert && pagesToConvert.length > 0) {
+        args.pagesToConvertAsImages = pagesToConvert;
+    }
+
+    const extractPerPageStr = po.extractPerPage as string | undefined;
+    if (extractPerPageStr) {
+        const pages = extractPerPageStr
+            .split(',')
+            .map((p) => p.trim())
+            .filter((p) => p.length > 0);
+        if (pages.length > 0) args.extractPerPage = pages;
+    }
+
+    // Extraction options
+    const eo = extractionOptions;
+    if (eo.extractionModelProvider) {
+        args.extractionModelProvider = eo.extractionModelProvider as LimescapeModelProvider;
+    }
+    const extractionModel = (eo.customExtractionModel as string) || (eo.extractionModel as string);
+    if (extractionModel) {
+        args.extractionModel = extractionModel;
+    }
+    if (eo.extractionPrompt) {
+        args.extractionPrompt = eo.extractionPrompt as string;
+    }
+    if (baseExtractionCredentials) {
+        args.extractionCredentials = baseExtractionCredentials;
+    }
+
+    // LLM params
+    if (Object.keys(llmParams).length > 0) {
+        args.llmParams = llmParams;
+    }
+    if (Object.keys(extractionLlmParams).length > 0) {
+        args.extractionLlmParams = extractionLlmParams;
+    }
+
+    return args;
 };
 
 
@@ -41,7 +318,7 @@ export class LimescapeDocs implements INodeType {
       name: 'limescapeDocs',
       icon: 'file:limescape-logo-square.svg',
       group: ['transform'],
-      version: 1,
+    version: [1.21],
       subtitle: '={{$parameter["operation"]}}',
       description: 'OCR & Document Extraction using vision models via Limescape Docs processing',
       defaults: {
@@ -81,12 +358,14 @@ export class LimescapeDocs implements INodeType {
               name: 'modelProvider',
               type: 'options',
               options: [
-                  { name: 'OpenAI', value: ZeroxModelProvider.OPENAI }, // Use Enum values
-                  { name: 'Azure', value: ZeroxModelProvider.AZURE },
-                  { name: 'Google', value: ZeroxModelProvider.GOOGLE },
-                  { name: 'AWS Bedrock', value: ZeroxModelProvider.BEDROCK },
+                  { name: 'OpenAI', value: LimescapeModelProvider.OPENAI },
+                  { name: 'Azure', value: LimescapeModelProvider.AZURE },
+                  { name: 'Azure AI Foundry', value: LimescapeModelProvider.AZURE_AIF },
+                  { name: 'Google (API Key)', value: LimescapeModelProvider.GOOGLE },
+                  { name: 'Google Vertex', value: LimescapeModelProvider.VERTEX },
+                  { name: 'AWS Bedrock', value: LimescapeModelProvider.BEDROCK },
               ],
-              default: ZeroxModelProvider.OPENAI, // Default is correctly set using Enum
+              default: LimescapeModelProvider.OPENAI,
               required: true,
               description: 'The LLM provider to use for processing',
               hint: 'Select the AI provider (e.g., OpenAI). Default: OpenAI. Required field.',
@@ -96,20 +375,27 @@ export class LimescapeDocs implements INodeType {
               name: 'model',
               type: 'options',
               // Alphabetized options
-								options: [
-									{ name: 'Claude 3 Haiku (Bedrock)', value: 'anthropic.claude-3-haiku-20240307-v1:0'},
-									{ name: 'Claude 3.5 Sonnet (Bedrock)', value: 'anthropic.claude-3-5-sonnet-20240620-v1:0' },
-									{ name: 'Gemini 1.5 Flash (Google)', value: 'gemini-1.5-flash' },
-									{ name: 'Gemini 1.5 Pro (Google)', value: 'gemini-1.5-pro' },
-									{ name: 'Gemini 2.5 Pro (Google)', value: 'gemini-2.5-pro' },
-									{ name: 'GPT-4.1 (OpenAI/Azure)', value: 'gpt-4.1' },
-									{ name: 'GPT-4.1 Mini (OpenAI/Azure)', value: 'gpt-4.1-mini' },
-									{ name: 'GPT-4.1 Mini Standard (OpenAI/Azure)', value: 'gpt-4.1-mini-standard' },
-									{ name: 'GPT-4.1 Standard (OpenAI/Azure)', value: 'gpt-4.1-standard' },
-									{ name: 'GPT-4o (OpenAI/Azure)', value: 'gpt-4o' },
-									{ name: 'GPT-4o Mini (OpenAI/Azure)', value: 'gpt-4o-mini' },
-								],
-								default: 'gpt-4.1-standard', // Set GPT-4.1 as default
+              options: [
+                                { name: 'Claude 4 Haiku (Bedrock)', value: 'anthropic.claude-4-haiku-20250601-v1:0' },
+                                { name: 'Claude 4 Opus (Bedrock)', value: 'anthropic.claude-4-opus-20250415-v1:0' },
+                                { name: 'Claude 4 Sonnet (Bedrock)', value: 'anthropic.claude-4-sonnet-20250601-v1:0' },
+                                { name: 'Claude 4.1 Haiku (Bedrock)', value: 'anthropic.claude-4.1-haiku-20250810-v1:0' },
+                                { name: 'Claude 4.1 Opus (Bedrock)', value: 'anthropic.claude-4.1-opus-20250810-v1:0' },
+                                { name: 'Claude 4.1 Sonnet (Bedrock)', value: 'anthropic.claude-4.1-sonnet-20250810-v1:0' },
+                                { name: 'Claude 4.5 Haiku (Bedrock)', value: 'anthropic.claude-4.5-haiku-20251020-v1:0' },
+                                { name: 'Claude 4.5 Sonnet (Bedrock)', value: 'anthropic.claude-4.5-sonnet-20250929-v1:0' },
+                                { name: 'Gemini 2.5 Flash (Google)', value: 'gemini-2.5-flash' },
+                                { name: 'Gemini 2.5 Flash Lite (Google)', value: 'gemini-2.5-flash-lite' },
+                                { name: 'Gemini 2.5 Pro (Google)', value: 'gemini-2.5-pro' },
+                                { name: 'Gemini 3 Pro Preview (Google)', value: 'gemini-3-pro-preview' },
+                                { name: 'GPT-4.1 (OpenAI/Azure)', value: 'gpt-4.1' },
+                                { name: 'GPT-4.1 Mini (OpenAI/Azure)', value: 'gpt-4.1-mini' },
+                                { name: 'GPT-4o (OpenAI/Azure)', value: 'gpt-4o' },
+                                { name: 'GPT-4o Mini (OpenAI/Azure)', value: 'gpt-4o-mini' },
+                                { name: 'GPT-5.1 (OpenAI/Azure)', value: 'gpt-5.1' },
+                                { name: 'GPT-5.1 Mini (OpenAI/Azure)', value: 'gpt-5.1-mini' },
+              ],
+              default: 'gpt-5.1',
               description: 'The specific model identifier for the selected provider',
               hint: 'Choose the AI model. Default: gpt-4.1-standard. Can be overridden by Custom Model.',
           },
@@ -188,14 +474,15 @@ export class LimescapeDocs implements INodeType {
               hint: 'Configure advanced OCR and document processing behaviors.',
               // Alphabetized options and fixed boolean descriptions
               options: [
-                  { displayName: 'Cleanup Temp Files', name: 'cleanup', type: 'boolean', default: true, description: 'Whether zerox should clean up its temporary files', hint: 'Automatically delete temporary files after processing. Default: true.' },
-                  { displayName: 'Concurrency', name: 'concurrency', type: 'number', default: 10, description: 'Internal concurrency limit for zerox operations', hint: 'Maximum parallel operations within the processor. Default: 10.' },
+                  { displayName: 'Cleanup Temp Files', name: 'cleanup', type: 'boolean', default: true, description: 'Whether Limescape Docs should clean up its temporary files', hint: 'Automatically delete temporary files after processing. Default: true.' },
+                  { displayName: 'Concurrency', name: 'concurrency', type: 'number', default: 10, description: 'Internal concurrency limit for Limescape Docs operations', hint: 'Maximum parallel operations within the processor. Default: 10.' },
                   { displayName: 'Correct Orientation', name: 'correctOrientation', type: 'boolean', default: true, description: 'Whether to attempt to auto-correct document image orientation', hint: 'Try to fix rotated pages. Default: true.' },
                   { displayName: 'Direct Image Extraction', name: 'directImageExtraction', type: 'boolean', default: false, description: 'Whether to extract directly from images without full OCR (if applicable)', hint: 'Attempt extraction from images without OCR (faster but less accurate). Default: false.' },
                   { displayName: 'Enable Hybrid Extraction', name: 'enableHybridExtraction', type: 'boolean', default: false, description: 'Whether to use hybrid OCR/extraction methods (if applicable)', hint: 'Use combined OCR/extraction techniques if supported. Default: false.' },
                   { displayName: 'Extract Only', name: 'extractOnly', type: 'boolean', default: false, description: 'Whether to perform only extraction based on schema/prompt, assuming OCR is done or not needed', hint: 'Skip OCR and only perform extraction (useful if text is already available). Default: false.' },
                   { displayName: 'Extract Per Page', name: 'extractPerPage', type: 'string', default: '', description: 'Comma-separated page numbers/ranges for targeted extraction', hint: 'Specify pages/ranges (e.g., 1,3-5) for extraction. Default: empty (all pages).' },
                   { displayName: 'Image Density (DPI)', name: 'imageDensity', type: 'number', default: 150, description: 'Target DPI for image conversion during OCR', typeOptions: { minValue: 70 }, hint: 'Resolution for image conversion during OCR. Min: 70. Default: 150.' },
+                  { displayName: 'Image Format', name: 'imageFormat', type: 'options', options: [ { name: 'PNG', value: 'png' }, { name: 'JPEG', value: 'jpeg' } ], default: 'png', description: 'Image format used for intermediate images during OCR', hint: 'Choose PNG or JPEG for intermediate image conversion. Default: PNG.' },
                   { displayName: 'Image Height (Pixels)', name: 'imageHeight', type: 'number', default: 3072, description: 'Target height for image resizing (preserves aspect ratio)', hint: 'Resize images to this height before processing. Default: 3072.' },
                   { displayName: 'Maintain Format', name: 'maintainFormat', type: 'boolean', default: false, description: 'Whether to attempt to preserve original document formatting in markdown output', hint: 'Try to keep original formatting in the Markdown output. Default: false.' },
                   { displayName: 'Max Image Size (MB)', name: 'maxImageSize', type: 'number', default: 15, description: 'Maximum size for individual images sent to the LLM', hint: 'Limit the size of images sent to the AI model. Default: 15 MB.' },
@@ -217,9 +504,21 @@ export class LimescapeDocs implements INodeType {
               description: 'Optional settings specific to the extraction model/prompt, overriding main settings if provided',
               hint: 'Override model, provider, or prompt specifically for the extraction step.',
               options: [
-                  // Similar structure for extractionModelProvider, extractionModel, customExtractionModel, extractionPrompt
-                   { displayName: 'Extraction Model Provider', name: 'extractionModelProvider', type: 'options', options: [ { name: 'OpenAI', value: ZeroxModelProvider.OPENAI }, /* ... add others */ ], default: '', description: 'Override provider for extraction step', hint: 'Optional: Select a different AI provider just for extraction. Default: empty (use main provider).' },
-                   { displayName: 'Extraction Model', name: 'extractionModel', type: 'options', options: [ { name: 'GPT-4o', value: 'gpt-4o' }, /* ... add others */ ], default: 'gpt-4o', description: 'Override model for extraction step', hint: 'Optional: Select a different AI model just for extraction. Default: gpt-4o.' }, // Fix default value
+                                     { displayName: 'Extraction Model Provider', name: 'extractionModelProvider', type: 'options', options: [
+                                         { name: 'OpenAI', value: LimescapeModelProvider.OPENAI },
+                                         { name: 'Azure', value: LimescapeModelProvider.AZURE },
+                                         { name: 'Azure AI Foundry', value: LimescapeModelProvider.AZURE_AIF },
+                                         { name: 'Google (API Key)', value: LimescapeModelProvider.GOOGLE },
+                                         { name: 'Google Vertex', value: LimescapeModelProvider.VERTEX },
+                                         { name: 'AWS Bedrock', value: LimescapeModelProvider.BEDROCK },
+                                     ], default: '', description: 'Override provider for extraction step', hint: 'Optional: Select a different AI provider just for extraction. Default: empty (use main provider).' },
+                                     { displayName: 'Extraction Model', name: 'extractionModel', type: 'options', options: [
+                                         { name: 'Claude 4.5 Sonnet (Bedrock)', value: 'anthropic.claude-4.5-sonnet-20250929-v1:0' },
+                                         { name: 'Gemini 2.5 Pro (Google)', value: 'gemini-2.5-pro' },
+                                         { name: 'Gemini 3 Pro Preview (Google)', value: 'gemini-3-pro-preview' },
+                                         { name: 'GPT-4o (OpenAI/Azure)', value: 'gpt-4o' },
+                                         { name: 'GPT-5.1 (OpenAI/Azure)', value: 'gpt-5.1' },
+                                     ], default: 'gpt-4o', description: 'Override model for extraction step', hint: 'Optional: Select a different AI model just for extraction. Default: gpt-4o.' },
                    { displayName: 'Custom Extraction Model', name: 'customExtractionModel', type: 'string', default: '', description: 'Override custom model for extraction step', hint: 'Optional: Enter a specific model ID to override the Extraction Model. Default: empty.' },
                    { displayName: 'Extraction Prompt', name: 'extractionPrompt', type: 'string', default: '', typeOptions: { rows: 4 }, description: 'Specific prompt for the extraction step', hint: 'Optional: Provide a prompt specifically for the extraction step. Default: empty (use main prompt or schema).' },
               ],
@@ -236,7 +535,8 @@ export class LimescapeDocs implements INodeType {
               options: [
                   { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes frequent tokens', hint: 'Discourage repeating the same tokens. Default: 0.' },
                   { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false, description: 'Whether to return log probabilities (if supported)', hint: 'Include token probabilities in the output (if model supports it). Default: false.' },
-                  { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 8192, description: 'Max tokens for the LLM response', typeOptions: { minValue: 1024, maxValue: 16383 }, hint: 'Maximum length of the AI response. Range: 1024-16383. Default: 8192.' },
+                  { displayName: 'Max Output Tokens', name: 'maxOutputTokens', type: 'number', default: 0, description: 'Max tokens for the generated output (e.g. Gemini)', hint: 'Primarily used by Google/Vertex Gemini models. 0 = library default.' },
+                  { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 8192, description: 'Max tokens for the LLM response', typeOptions: { minValue: 1 }, hint: 'Maximum length of the AI response. Default: 8192.' },
                   { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes new tokens', hint: 'Discourage introducing new topics. Default: 0.' },
                   { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, description: 'Controls randomness (0=deterministic)', hint: 'Higher values mean more creativity, lower means more focused. Default: 0.2.' },
                   { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, description: 'Nucleus sampling parameter', hint: 'Alternative to temperature for controlling randomness. Default: 1.' },
@@ -252,12 +552,13 @@ export class LimescapeDocs implements INodeType {
               hint: 'Fine-tune the behavior of the extraction AI model, overriding main LLM parameters.',
               // Alphabetized options
               options: [
-                   { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, hint: 'Extraction specific: Discourage repeating tokens. Default: 0.' },
-                   { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false, hint: 'Extraction specific: Include token probabilities. Default: false.' },
-                   { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 8192, typeOptions: { minValue: 1024, maxValue: 16383 }, hint: 'Extraction specific: Max response length. Range: 1024-16383. Default: 8192.' },
-                   { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, hint: 'Extraction specific: Discourage new topics. Default: 0.' },
-                   { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, hint: 'Extraction specific: Controls randomness. Default: 0.1.' },
-                   { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, hint: 'Extraction specific: Nucleus sampling. Default: 1.' },
+                    { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, hint: 'Extraction specific: Discourage repeating tokens. Default: 0.' },
+                    { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false, hint: 'Extraction specific: Include token probabilities. Default: false.' },
+                    { displayName: 'Max Output Tokens', name: 'maxOutputTokens', type: 'number', default: 0, hint: 'Extraction specific: Max generated tokens (e.g. Gemini). 0 = library default.' },
+                    { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 8192, typeOptions: { minValue: 1 }, hint: 'Extraction specific: Max response length. Default: 8192.' },
+                    { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, hint: 'Extraction specific: Discourage new topics. Default: 0.' },
+                    { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, hint: 'Extraction specific: Controls randomness. Default: 0.1.' },
+                    { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, hint: 'Extraction specific: Nucleus sampling. Default: 1.' },
               ],
           },
       ],
@@ -295,7 +596,7 @@ export class LimescapeDocs implements INodeType {
 
       // --- Get Global Node Parameters ---
       const binaryPropertyName = this.getNodeParameter('binaryPropertyName', 0) as string;
-      const globalModelProvider = this.getNodeParameter('modelProvider', 0) as ZeroxModelProvider;
+    const globalModelProvider = this.getNodeParameter('modelProvider', 0) as LimescapeModelProvider;
       const globalModel = this.getNodeParameter('model', 0) as string;
       const globalCustomModel = this.getNodeParameter('customModel', 0, '') as string;
       const globalSchemaRaw = this.getNodeParameter('schema', 0, '') as string | object;
@@ -334,226 +635,137 @@ export class LimescapeDocs implements INodeType {
       // --- Get Credentials ---
       const credentials = await this.getCredentials('limescapeDocsApi') as IDataObject;
 
-      // --- Prepare Base Credentials (using IDataObject for flexibility) ---
-      const baseModelCredentials: IDataObject = {};
-      let baseExtractionCredentials: IDataObject | undefined = undefined; // Initialize as undefined
-
-      // Corrected mapCredentials function using IDataObject
-      /**
-       * Maps credentials for the selected provider only.
-       * Throws a clear error if required credentials for the selected provider are missing.
-       * Ignores credentials for other providers, even if present.
-       */
-      const mapCredentials = (provider: ZeroxModelProvider, targetCreds: IDataObject) => {
-          if (provider === ZeroxModelProvider.OPENAI) {
-              if (!credentials.openaiApiKey) {
-                  throw new NodeOperationError(this.getNode(), 'OpenAI API Key is required when using OpenAI as the provider.', { itemIndex: -1 });
-              }
-              targetCreds.apiKey = credentials.openaiApiKey as string;
-          } else if (provider === ZeroxModelProvider.AZURE) {
-              if (!credentials.azureApiKey || !credentials.azureEndpoint) {
-                  throw new NodeOperationError(this.getNode(), 'Azure API Key and Azure Endpoint are required when using Azure as the provider.', { itemIndex: -1 });
-              }
-              targetCreds.apiKey = credentials.azureApiKey as string;
-              targetCreds.endpoint = credentials.azureEndpoint as string;
-          } else if (provider === ZeroxModelProvider.GOOGLE) {
-              if (!credentials.googleApiKey) {
-                  throw new NodeOperationError(this.getNode(), 'Google API Key is required when using Google as the provider.', { itemIndex: -1 });
-              }
-              targetCreds.apiKey = credentials.googleApiKey as string;
-          } else if (provider === ZeroxModelProvider.BEDROCK) {
-              if (!credentials.bedrockAccessKeyId || !credentials.bedrockSecretAccessKey || !credentials.bedrockRegion) {
-                  throw new NodeOperationError(this.getNode(), 'AWS Bedrock Access Key ID, Secret Key, and Region are required when using AWS Bedrock as the provider.', { itemIndex: -1 });
-              }
-              targetCreds.accessKeyId = credentials.bedrockAccessKeyId as string;
-              targetCreds.secretAccessKey = credentials.bedrockSecretAccessKey as string;
-              targetCreds.region = credentials.bedrockRegion as string;
-              if (credentials.bedrockSessionToken) {
-                  targetCreds.sessionToken = credentials.bedrockSessionToken as string;
-              }
-          } else {
-              throw new NodeOperationError(this.getNode(), `Unsupported provider type in mapCredentials: ${provider}`, { itemIndex: -1 });
-          }
-      };
-
       try {
-          mapCredentials(globalModelProvider, baseModelCredentials);
-          // Prepare extraction credentials only if a provider is specified
-          const extractionProvider = globalExtractionOptions.extractionModelProvider as ZeroxModelProvider | undefined;
+          const baseModelCredentials = mapCredentialsForProvider(this, globalModelProvider, credentials);
+          let baseExtractionCredentials: ModelCredentials | undefined;
+          const extractionProvider = globalExtractionOptions.extractionModelProvider as LimescapeModelProvider | undefined;
           if (extractionProvider) {
-              baseExtractionCredentials = {}; // Create the object only if needed
-              mapCredentials(extractionProvider, baseExtractionCredentials);
-          }
-      } catch (error) {
-           if (error instanceof NodeOperationError) throw error;
-           throw new NodeOperationError(this.getNode(), `Failed to map credentials: ${error instanceof Error ? error.message : String(error)}`, { itemIndex: -1 });
-      }
-
-      // --- Parse Global Schema Once ---
-      let globalSchema: Record<string, unknown> | undefined;
-      if (globalSchemaRaw) {
-          try {
-              globalSchema = typeof globalSchemaRaw === 'string' && globalSchemaRaw.trim() !== ''
-                  ? JSON.parse(globalSchemaRaw)
-                  : (typeof globalSchemaRaw === 'object' ? globalSchemaRaw : undefined);
-               if (typeof globalSchema !== 'object' || globalSchema === null) {
-                   globalSchema = undefined; // Ensure it's undefined if parsing results in non-object
-               }
-          } catch (error) {
-              throw new NodeOperationError(this.getNode(), `Invalid JSON schema provided: ${error instanceof Error ? error.message : String(error)}`, { itemIndex: -1 }); // Error before loop
-          }
-      }
-
-
-      // --- Process Each Item ---
-      // Get attachment filter settings
-      const attachmentFilter = this.getNodeParameter('attachmentFilter', 0, {}) as IDataObject;
-      const filterMode = (attachmentFilter.filterMode as string) || 'include';
-      const extensions = typeof attachmentFilter.extensions === 'string'
-          ? attachmentFilter.extensions.split(',').map(e => e.trim().toLowerCase()).filter(e => !!e)
-          : [];
-
-      for (let i = 0; i < items.length; i++) {
-          let tempFilePath: string | null = null;
-          let currentFilename = `item_${i}_binary`; // Default filename
-          let currentExtension = '';
-          const item = items[i];
-
-          // --- Attachment filter logic ---
-          if (item.binary) {
-              const binaryData = item.binary[binaryPropertyName] as IBinaryData;
-              currentFilename = binaryData.fileName || currentFilename;
-              currentExtension = path.extname(currentFilename).substring(1).toLowerCase();
-              // Apply filter
-              const shouldProcess = filterMode === 'include'
-                  ? extensions.includes(currentExtension)
-                  : !extensions.includes(currentExtension);
-              if (!shouldProcess) {
-                  aggregatedResults.processingIssues.push(`Skipped Item ${i} (${currentFilename}): Filtered out by attachment filter.`);
-                  continue;
-              }
+              baseExtractionCredentials = mapCredentialsForProvider(this, extractionProvider, credentials);
           }
 
-          try {
-              // --- 1. Get Binary Data ---
-              if (!item.binary || !item.binary[binaryPropertyName]) {
-                  throw new NodeOperationError(this.getNode(), `Missing binary data in property '${binaryPropertyName}' for item ${i}.`, { itemIndex: i });
-              }
-              const binaryData = item.binary[binaryPropertyName] as IBinaryData;
-              currentFilename = binaryData.fileName || currentFilename;
-              currentExtension = path.extname(currentFilename).substring(1).toLowerCase();
+          // --- Parse Global Schema Once ---
+          const globalSchema = parseSchema(this, globalSchemaRaw);
 
-              const fileBuffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+          // Build LLM params objects once
+          const globalLlmParams = buildLLMParams(globalLlmParameters);
+          const globalExtractionLlmParams = buildLLMParams(globalExtractionLlmParameters);
 
-              // --- 2. Create Temporary File ---
-              const tempDir = (globalProcessingOptions.tempDir as string || os.tmpdir()).trim();
-              if (tempDir) {
-                 ensureDirSync(tempDir);
-              }
-              tempFilePath = path.join(tempDir || os.tmpdir(), `n8n_zerox_${Date.now()}_${i}_${path.basename(currentFilename)}`);
-              fs.writeFileSync(tempFilePath, fileBuffer);
+          // --- Process Each Item ---
+          // Get attachment filter settings
+          const attachmentFilter = this.getNodeParameter('attachmentFilter', 0, {}) as IDataObject;
+          const filterMode = (attachmentFilter.filterMode as string) || 'include';
+          const extensions = typeof attachmentFilter.extensions === 'string'
+              ? attachmentFilter.extensions.split(',').map(e => e.trim().toLowerCase()).filter(e => !!e)
+              : [];
 
-              // --- 3. Prepare Zerox Arguments for this item ---
-              const zeroxArgs: ZeroxArgs = {
-                  filePath: tempFilePath,
-                  // APPLY FIX: Use double assertion as mapCredentials ensures the correct structure at runtime
-                  credentials: baseModelCredentials as unknown as ModelCredentials,
-                  model: globalCustomModel || globalModel,
-                  modelProvider: globalModelProvider,
-              };
+          for (let i = 0; i < items.length; i++) {
+              let tempFilePath: string | null = null;
+              let currentFilename = `item_${i}_binary`; // Default filename
+              let currentExtension = '';
+              const item = items[i];
 
-              // Add optional parameters carefully
-              if (globalProcessingOptions.outputDir) zeroxArgs.outputDir = globalProcessingOptions.outputDir as string;
-              if (globalProcessingOptions.tempDir) zeroxArgs.tempDir = globalProcessingOptions.tempDir as string;
-              if (globalProcessingOptions.cleanup !== undefined) zeroxArgs.cleanup = globalProcessingOptions.cleanup as boolean;
-              if (globalProcessingOptions.concurrency !== undefined) zeroxArgs.concurrency = globalProcessingOptions.concurrency as number;
-              if (globalProcessingOptions.correctOrientation !== undefined) zeroxArgs.correctOrientation = globalProcessingOptions.correctOrientation as boolean;
-              if (globalProcessingOptions.directImageExtraction !== undefined) zeroxArgs.directImageExtraction = globalProcessingOptions.directImageExtraction as boolean;
-              if (globalProcessingOptions.enableHybridExtraction !== undefined) zeroxArgs.enableHybridExtraction = globalProcessingOptions.enableHybridExtraction as boolean;
-              if (globalProcessingOptions.extractOnly !== undefined) zeroxArgs.extractOnly = globalProcessingOptions.extractOnly as boolean;
-              if (globalProcessingOptions.imageDensity !== undefined) zeroxArgs.imageDensity = globalProcessingOptions.imageDensity as number;
-              if (globalProcessingOptions.imageHeight !== undefined) zeroxArgs.imageHeight = globalProcessingOptions.imageHeight as number;
-              if (globalProcessingOptions.maintainFormat !== undefined) zeroxArgs.maintainFormat = globalProcessingOptions.maintainFormat as boolean;
-              if (globalProcessingOptions.maxImageSize !== undefined) zeroxArgs.maxImageSize = globalProcessingOptions.maxImageSize as number;
-              if (globalProcessingOptions.maxRetries !== undefined) zeroxArgs.maxRetries = globalProcessingOptions.maxRetries as number;
-              if (globalProcessingOptions.maxTesseractWorkers !== undefined) zeroxArgs.maxTesseractWorkers = globalProcessingOptions.maxTesseractWorkers as number;
-              if (globalProcessingOptions.prompt) zeroxArgs.prompt = globalProcessingOptions.prompt as string;
-              if (globalProcessingOptions.trimEdges !== undefined) zeroxArgs.trimEdges = globalProcessingOptions.trimEdges as boolean;
-              if (globalSchema) zeroxArgs.schema = globalSchema;
-
-               const pagesToConvert = parsePages(globalProcessingOptions.pagesToConvertAsImages as string);
-               if (pagesToConvert !== undefined) {
-                   zeroxArgs.pagesToConvertAsImages = Array.isArray(pagesToConvert) ? pagesToConvert : [pagesToConvert];
-               }
-
-               const extractPerPageStr = globalProcessingOptions.extractPerPage as string;
-               if (extractPerPageStr) {
-                   const pages = extractPerPageStr.split(',').map(p => p.trim()).filter(p => p);
-                   if (pages.length > 0) zeroxArgs.extractPerPage = pages;
-               }
-
-              // Add extraction options
-              if (globalExtractionOptions.extractionModelProvider) zeroxArgs.extractionModelProvider = globalExtractionOptions.extractionModelProvider as ZeroxModelProvider;
-              const extractionModel = (globalExtractionOptions.customExtractionModel as string) || (globalExtractionOptions.extractionModel as string);
-              if (extractionModel) zeroxArgs.extractionModel = extractionModel;
-              if (globalExtractionOptions.extractionPrompt) zeroxArgs.extractionPrompt = globalExtractionOptions.extractionPrompt as string;
-              // APPLY FIX: Use double assertion as mapCredentials ensures the correct structure at runtime
-              if (baseExtractionCredentials) zeroxArgs.extractionCredentials = baseExtractionCredentials as unknown as ModelCredentials;
-
-              // Add LLM Params (handle potential empty objects)
-              if (Object.keys(globalLlmParameters).length > 0) zeroxArgs.llmParams = globalLlmParameters as any;
-              if (Object.keys(globalExtractionLlmParameters).length > 0) zeroxArgs.extractionLlmParams = globalExtractionLlmParameters as any;
-
-
-              // --- 4. Call Zerox ---
-              const result = await zerox({ ...zeroxArgs, errorMode: ZeroxErrorMode.THROW });
-
-              // --- 5. Aggregate Successful Results ---
-               if (aggregatedResults.markdown.length > 0) { aggregatedResults.markdown += "\n\n---\n\n"; }
-               aggregatedResults.markdown += `### Attachment Start: ${currentFilename} (Type: ${currentExtension})\n\n`;
-
-               const markdownText = result.pages && Array.isArray(result.pages)
-                  ? result.pages.map(page => page.content).join("\n\n")
-                  : "[No page content returned]";
-
-              aggregatedResults.markdown += markdownText;
-              aggregatedResults.markdown += `\n\n### Attachment End: ${currentFilename}\n\n`;
-
-              aggregatedResults.filenames.push(currentFilename);
-              aggregatedResults.filetypes.push(currentExtension);
-              aggregatedResults.completionTime += result.completionTime || 0;
-              aggregatedResults.inputTokens += result.inputTokens || 0;
-              aggregatedResults.outputTokens += result.outputTokens || 0;
-              aggregatedResults.pagesProcessed += Array.isArray(result.pages) ? result.pages.length : 0;
-              if (result.extracted) aggregatedResults.extractedData.push(result.extracted);
-              if (result.summary) {
-                  aggregatedResults.summaries.push(typeof result.summary === 'string' ? result.summary : JSON.stringify(result.summary));
-              }
-
-              processedFileCount++;
-
-          } catch (error) {
-              // --- N8N error output handling ---
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              successData.push({
-                  json: { message: errorMessage, itemIndex: i, file: currentFilename },
-                  error: new NodeOperationError(this.getNode(), errorMessage, { itemIndex: i }),
-                  itemIndex: i,
-              });
-              continue; // Continue to next item
-          } finally {
-              // --- 6. Cleanup Temporary File ---
-              if (tempFilePath && fs.existsSync(tempFilePath)) {
-                  try {
-                      fs.unlinkSync(tempFilePath);
-                  } catch (unlinkError) {
-                      const errorMsg = `[Zerox Node] Failed to delete temp file ${tempFilePath}: ${unlinkError instanceof Error ? unlinkError.message : String(unlinkError)}`;
-                      console.error(errorMsg);
-                      aggregatedResults.processingIssues.push(`Failed to delete temp file: ${path.basename(tempFilePath)}`);
+              // --- Attachment filter logic ---
+              if (item.binary) {
+                  const binaryData = item.binary[binaryPropertyName] as IBinaryData;
+                  currentFilename = binaryData.fileName || currentFilename;
+                  currentExtension = path.extname(currentFilename).substring(1).toLowerCase();
+                  // Apply filter
+                  const shouldProcess = filterMode === 'include'
+                      ? extensions.includes(currentExtension)
+                      : !extensions.includes(currentExtension);
+                  if (!shouldProcess) {
+                      aggregatedResults.processingIssues.push(`Skipped Item ${i} (${currentFilename}): Filtered out by attachment filter.`);
+                      continue;
                   }
               }
-          } // End of try...catch...finally for a single item
-      } // --- End of loop ---
+
+              try {
+                  // --- 1. Get Binary Data ---
+                  if (!item.binary || !item.binary[binaryPropertyName]) {
+                      throw new NodeOperationError(this.getNode(), `Missing binary data in property '${binaryPropertyName}' for item ${i}.`, { itemIndex: i });
+                  }
+                  const binaryData = item.binary[binaryPropertyName] as IBinaryData;
+                  currentFilename = binaryData.fileName || currentFilename;
+                  currentExtension = path.extname(currentFilename).substring(1).toLowerCase();
+
+                  const fileBuffer = await this.helpers.getBinaryDataBuffer(i, binaryPropertyName);
+
+                  // --- 2. Create Temporary File ---
+                  const tempDir = (globalProcessingOptions.tempDir as string || os.tmpdir()).trim();
+                  if (tempDir) {
+                     ensureDirSync(tempDir);
+                  }
+                  tempFilePath = path.join(tempDir || os.tmpdir(), `n8n_limescape_docs_${Date.now()}_${i}_${path.basename(currentFilename)}`);
+                  fs.writeFileSync(tempFilePath, fileBuffer);
+
+                  // --- 3. Prepare LimescapeDocs arguments for this item ---
+                  const effectiveModel = globalCustomModel || globalModel;
+                  const limescapeArgs = buildLimescapeArgsForItem({
+                    filePath: tempFilePath,
+                    modelProvider: globalModelProvider,
+                    model: effectiveModel,
+                    schema: globalSchema,
+                    processingOptions: globalProcessingOptions,
+                    extractionOptions: globalExtractionOptions,
+                    llmParams: globalLlmParams,
+                    extractionLlmParams: globalExtractionLlmParams,
+                    baseCredentials: baseModelCredentials,
+                    baseExtractionCredentials,
+                  });
+
+                  // --- 4. Call Limescape Docs ---
+                  const result = await limescapeDocs({ ...limescapeArgs, errorMode: LimescapeErrorMode.THROW });
+
+                  // --- 5. Aggregate Successful Results ---
+                   if (aggregatedResults.markdown.length > 0) { aggregatedResults.markdown += "\n\n---\n\n"; }
+                   aggregatedResults.markdown += `### Attachment Start: ${currentFilename} (Type: ${currentExtension})\n\n`;
+
+                   const markdownText = result.pages && Array.isArray(result.pages)
+                      ? result.pages.map(page => page.content).join("\n\n")
+                      : "[No page content returned]";
+
+                  aggregatedResults.markdown += markdownText;
+                  aggregatedResults.markdown += `\n\n### Attachment End: ${currentFilename}\n\n`;
+
+                  aggregatedResults.filenames.push(currentFilename);
+                  aggregatedResults.filetypes.push(currentExtension);
+                  aggregatedResults.completionTime += (result.completionTime as number | undefined) || 0;
+                  aggregatedResults.inputTokens += (result.inputTokens as number | undefined) || 0;
+                  aggregatedResults.outputTokens += (result.outputTokens as number | undefined) || 0;
+                  aggregatedResults.pagesProcessed += Array.isArray(result.pages) ? result.pages.length : 0;
+                  if (result.extracted) aggregatedResults.extractedData.push(result.extracted);
+                  if (result.summary) {
+                      aggregatedResults.summaries.push(typeof result.summary === 'string' ? result.summary : JSON.stringify(result.summary));
+                  }
+
+                  processedFileCount++;
+
+              } catch (error) {
+                  // --- N8N error output handling ---
+                  const errorMessage = error instanceof Error ? error.message : String(error);
+                  successData.push({
+                      json: { message: errorMessage, itemIndex: i, file: currentFilename },
+                      error: new NodeOperationError(this.getNode(), errorMessage, { itemIndex: i }),
+                      itemIndex: i,
+                  });
+                  continue; // Continue to next item
+              } finally {
+                  // --- 6. Cleanup Temporary File ---
+                  if (tempFilePath && fs.existsSync(tempFilePath)) {
+                      try {
+                          fs.unlinkSync(tempFilePath);
+                      } catch (unlinkError) {
+                          const errorMsg = `[Limescape Docs Node] Failed to delete temp file ${tempFilePath}: ${unlinkError instanceof Error ? unlinkError.message : String(unlinkError)}`;
+                          console.error(errorMsg);
+                          aggregatedResults.processingIssues.push(`Failed to delete temp file: ${path.basename(tempFilePath)}`);
+                      }
+                  }
+              } // End of try...catch...finally for a single item
+          } // --- End of loop ---
+      } catch (error) {
+           if (error instanceof NodeOperationError) throw error;
+           throw new NodeOperationError(this.getNode(), `Failed to initialize Limescape Docs processing: ${error instanceof Error ? error.message : String(error)}`, { itemIndex: -1 });
+      }
 
       // --- Final Aggregated Output ---
       if (processedFileCount > 0 || (aggregatedResults.processingIssues.length > 0 && processedFileCount === 0)) {

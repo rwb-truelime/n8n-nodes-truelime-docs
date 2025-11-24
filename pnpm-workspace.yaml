@@ -1,6 +1,10 @@
 onlyBuiltDependencies:
+  - '@sentry-internal/node-native-stacktrace'
   - cpu-features
   - eslint-plugin-n8n-nodes-base
-  - limescape-docs-processor
+  - limescape-docs
+  - limescape-docs
+  - sharp
   - ssh2
+  - tesseract.js
   - zerox
