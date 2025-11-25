@@ -87,7 +87,6 @@ const buildLLMParams = (input: IDataObject): Partial<LLMParams> => {
         params.logprobs = Boolean(input.logprobs);
     }
     return params as Partial<LLMParams>;
-    return params;
 };
 
 // Helper to parse schema once from node parameter
@@ -153,7 +152,7 @@ const mapCredentialsForProvider = (
     }
 
     if (provider === LimescapeModelProvider.AZURE_AIF) {
-        if (!credentials.azureAifApiKey || !credentials.azureAifBaseURL) {
+        if (!credentials.azureAifApiKey || !credentials.azureAifBaseUrl) {
             throw new NodeOperationError(
                 node.getNode(),
                 'Azure AI Foundry API Key and Base URL are required when using Azure AI Foundry as the provider.',
@@ -162,7 +161,7 @@ const mapCredentialsForProvider = (
         }
         return {
             apiKey: credentials.azureAifApiKey as string,
-            baseURL: credentials.azureAifBaseURL as string,
+            baseUrl: credentials.azureAifBaseUrl as string,
         } as ModelCredentials;
     }
 
@@ -192,17 +191,10 @@ const mapCredentialsForProvider = (
     }
 
     if (provider === LimescapeModelProvider.BEDROCK) {
-        if (!credentials.bedrockAccessKeyId || !credentials.bedrockSecretAccessKey || !credentials.bedrockRegion) {
-            throw new NodeOperationError(
-                node.getNode(),
-                'AWS Bedrock Access Key ID, Secret Key, and Region are required when using AWS Bedrock as the provider.',
-                { itemIndex: -1 },
-            );
-        }
         return {
-            accessKeyId: credentials.bedrockAccessKeyId as string,
-            secretAccessKey: credentials.bedrockSecretAccessKey as string,
             region: credentials.bedrockRegion as string,
+            accessKeyId: (credentials.bedrockAccessKeyId as string | undefined) || undefined,
+            secretAccessKey: (credentials.bedrockSecretAccessKey as string | undefined) || undefined,
             sessionToken: (credentials.bedrockSessionToken as string | undefined) || undefined,
         } as ModelCredentials;
     }
@@ -320,7 +312,7 @@ export class LimescapeDocs implements INodeType {
       group: ['transform'],
     version: [1.21],
       subtitle: '={{$parameter["operation"]}}',
-      description: 'OCR & Document Extraction using vision models via Limescape Docs processing',
+      description: 'OCR & Document Extraction using AI models via Limescape Docs',
       defaults: {
           name: 'Limescape Docs',
       },
@@ -394,10 +386,11 @@ export class LimescapeDocs implements INodeType {
                                 { name: 'GPT-4o Mini (OpenAI/Azure)', value: 'gpt-4o-mini' },
                                 { name: 'GPT-5.1 (OpenAI/Azure)', value: 'gpt-5.1' },
                                 { name: 'GPT-5.1 Mini (OpenAI/Azure)', value: 'gpt-5.1-mini' },
+                                { name: 'GPT-5.1 Standard (OpenAI/Azure)', value: 'gpt-5.1-standard' },
               ],
-              default: 'gpt-5.1',
+              default: 'gpt-5.1-standard',
               description: 'The specific model identifier for the selected provider',
-              hint: 'Choose the AI model. Default: gpt-4.1-standard. Can be overridden by Custom Model.',
+              hint: 'Choose the AI model. Default: gpt-5.1-standard. Can be overridden by Custom Model.',
           },
           {
               displayName: 'Custom Model',
@@ -405,7 +398,7 @@ export class LimescapeDocs implements INodeType {
               type: 'string',
               default: '',
               description: 'Overrides the Model selection. Use the exact model identifier required by the provider/library.',
-              placeholder: 'e.g., gpt-4-turbo or specific Azure deployment ID',
+              placeholder: 'e.g., gpt-5.1 or specific Azure deployment ID',
               hint: 'Optional: Enter a specific model ID to override the Model selection. Leave empty to use the selected Model.',
           },
            {
@@ -542,6 +535,50 @@ export class LimescapeDocs implements INodeType {
                   { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, description: 'Nucleus sampling parameter', hint: 'Alternative to temperature for controlling randomness. Default: 1.' },
               ],
           },
+          {
+              displayName: 'Gemini 3 Options',
+              name: 'gemini3Options',
+              type: 'collection',
+              placeholder: 'Add Gemini 3 Option',
+              default: {},
+              description: 'Options specific to Google/Vertex Gemini 3 models',
+              hint: 'Available only for Gemini 3 Pro Preview models.',
+              displayOptions: {
+                  show: {
+                      modelProvider: [
+                          LimescapeModelProvider.GOOGLE,
+                          LimescapeModelProvider.VERTEX,
+                      ],
+                  },
+              },
+              options: [
+                  {
+                      displayName: 'Thinking Level',
+                      name: 'thinkingLevel',
+                      type: 'options',
+                      options: [
+                          { name: 'Low', value: 'low' },
+                          { name: 'High', value: 'high' },
+                      ],
+                      default: 'low',
+                      description: 'Controls depth of reasoning for Gemini 3 models',
+                      hint: 'Applied only for Gemini 3 models; availability may vary by region/project.',
+                  },
+                  {
+                      displayName: 'Media Resolution',
+                      name: 'mediaResolution',
+                      type: 'options',
+                      options: [
+                          { name: 'Low', value: 'low' },
+                          { name: 'Medium', value: 'medium' },
+                          { name: 'High', value: 'high' },
+                      ],
+                      default: 'medium',
+                      description: 'Controls image resolution used by Gemini 3 models',
+                      hint: 'Higher resolutions may improve OCR quality at higher cost.',
+                  },
+              ],
+          },
            {
               displayName: 'Extraction LLM Parameters',
               name: 'extractionLlmParameters',
@@ -604,6 +641,7 @@ export class LimescapeDocs implements INodeType {
       const globalExtractionOptions = this.getNodeParameter('extractionOptions', 0, {}) as IDataObject;
       const globalLlmParameters = this.getNodeParameter('llmParameters', 0, {}) as IDataObject;
       const globalExtractionLlmParameters = this.getNodeParameter('extractionLlmParameters', 0, {}) as IDataObject;
+    const globalGemini3Options = this.getNodeParameter('gemini3Options', 0, {}) as IDataObject;
 
       // --- Parameter Validation Safeguards ---
       // Validate maxTokens in both LLM Parameters and Extraction LLM Parameters
@@ -700,7 +738,7 @@ export class LimescapeDocs implements INodeType {
 
                   // --- 3. Prepare LimescapeDocs arguments for this item ---
                   const effectiveModel = globalCustomModel || globalModel;
-                  const limescapeArgs = buildLimescapeArgsForItem({
+                    const limescapeArgs = buildLimescapeArgsForItem({
                     filePath: tempFilePath,
                     modelProvider: globalModelProvider,
                     model: effectiveModel,
@@ -712,6 +750,21 @@ export class LimescapeDocs implements INodeType {
                     baseCredentials: baseModelCredentials,
                     baseExtractionCredentials,
                   });
+
+                  const isGemini3Model = typeof effectiveModel === 'string' && effectiveModel.toLowerCase().startsWith('gemini-3');
+                  // Gemini 3 specific options mapping
+                  if (isGemini3Model && globalGemini3Options && Object.keys(globalGemini3Options).length > 0) {
+                      limescapeArgs.googleOptions = limescapeArgs.googleOptions ?? {};
+                      limescapeArgs.googleOptions.gemini3 = {};
+
+                      if (typeof globalGemini3Options.thinkingLevel === 'string' && globalGemini3Options.thinkingLevel) {
+                          limescapeArgs.googleOptions.gemini3.thinkingLevel = globalGemini3Options.thinkingLevel as 'low' | 'high';
+                      }
+
+                      if (typeof globalGemini3Options.mediaResolution === 'string' && globalGemini3Options.mediaResolution) {
+                          limescapeArgs.googleOptions.gemini3.mediaResolution = globalGemini3Options.mediaResolution as 'low' | 'medium' | 'high';
+                      }
+                  }
 
                   // --- 4. Call Limescape Docs ---
                   const result = await limescapeDocs({ ...limescapeArgs, errorMode: LimescapeErrorMode.THROW });
