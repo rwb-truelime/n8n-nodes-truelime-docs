@@ -7,21 +7,35 @@ export class LimescapeDocsApi implements ICredentialType {
     properties: INodeProperties[] = [
         // OpenAI
         {
+            displayName: 'OpenAI',
+            name: 'openaiNotice',
+            type: 'notice',
+            default: '',
+        },
+        {
             displayName: 'OpenAI API Key',
             name: 'openaiApiKey',
             type: 'string',
             typeOptions: { password: true },
             default: '',
-            description: 'Your OpenAI API key (maps to credentials.apiKey when using ModelProvider.OPENAI)',
+            description:
+                'Your OpenAI API key (maps to credentials.apiKey when using ModelProvider.OPENAI)',
         },
         // Azure OpenAI (legacy)
+        {
+            displayName: 'Azure OpenAI',
+            name: 'azureNotice',
+            type: 'notice',
+            default: '',
+        },
         {
             displayName: 'Azure OpenAI API Key',
             name: 'azureApiKey',
             type: 'string',
             typeOptions: { password: true },
             default: '',
-            description: 'Your Azure OpenAI API key (maps to credentials.apiKey when using ModelProvider.AZURE)',
+            description:
+                'Your Azure OpenAI API key (maps to credentials.apiKey when using ModelProvider.AZURE)',
         },
         {
             displayName: 'Azure OpenAI Endpoint',
@@ -37,16 +51,24 @@ export class LimescapeDocsApi implements ICredentialType {
             type: 'string',
             default: '',
             placeholder: '2024-10-21',
-            description: 'Optional Azure OpenAI API version override (maps to credentials.azureApiVersion)',
+            description:
+                'Optional Azure OpenAI API version override (maps to credentials.azureApiVersion)',
         },
         // Azure AI Foundry v1
+        {
+            displayName: 'Azure AI Foundry',
+            name: 'azureAifNotice',
+            type: 'notice',
+            default: '',
+        },
         {
             displayName: 'Azure AI Foundry Base URL (Optional)',
             name: 'azureAifBaseUrl',
             type: 'string',
             default: '',
             placeholder: 'https://<deployment>.<region>.models.ai.azure.com/v1',
-            description: 'Base URL for Azure AI Foundry v1 (maps to credentials.baseUrl when using ModelProvider.AZURE_AIF)',
+            description:
+                'Base URL for Azure AI Foundry v1 (maps to credentials.baseUrl when using ModelProvider.AZURE_AIF)',
         },
         {
             displayName: 'Azure AI Foundry API Key (Optional)',
@@ -54,25 +76,40 @@ export class LimescapeDocsApi implements ICredentialType {
             type: 'string',
             typeOptions: { password: true },
             default: '',
-            description: 'API key for Azure AI Foundry v1 (maps to credentials.apiKey when using ModelProvider.AZURE_AIF)',
+            description:
+                'API key for Azure AI Foundry v1 (maps to credentials.apiKey when using ModelProvider.AZURE_AIF)',
         },
         // Google Gemini (direct Google GenAI)
+        {
+            displayName: 'Google Gemini',
+            name: 'googleNotice',
+            type: 'notice',
+            default: '',
+        },
         {
             displayName: 'Google Gemini API Key',
             name: 'googleApiKey',
             type: 'string',
             typeOptions: { password: true },
             default: '',
-            description: 'Your Google GenAI (Gemini) API key (maps to credentials.apiKey when using ModelProvider.GOOGLE)',
+            description:
+                'Your Google GenAI (Gemini) API key (maps to credentials.apiKey when using ModelProvider.GOOGLE)',
         },
         // Google Vertex AI
+        {
+            displayName: 'Google Vertex',
+            name: 'vertexNotice',
+            type: 'notice',
+            default: '',
+        },
         {
             displayName: 'Vertex Service Account JSON (Optional)',
             name: 'vertexServiceAccount',
             type: 'string',
             typeOptions: { password: true },
             default: '',
-            description: 'Service account JSON string for Vertex AI (maps to credentials.serviceAccount when using ModelProvider.VERTEX)',
+            description:
+                'Service account JSON string for Vertex AI (maps to credentials.serviceAccount when using ModelProvider.VERTEX)',
         },
         {
             displayName: 'Vertex Location (Optional)',
@@ -80,9 +117,24 @@ export class LimescapeDocsApi implements ICredentialType {
             type: 'string',
             default: '',
             placeholder: 'europe-west1',
-            description: 'Vertex AI region / location (maps to credentials.location for Vertex AI)',
+            description:
+                'Vertex AI region / location (maps to credentials.location for Vertex AI)',
         },
         // AWS Bedrock
+        {
+            displayName: 'AWS Bedrock',
+            name: 'bedrockNotice',
+            type: 'notice',
+            default: '',
+        },
+        {
+            displayName: 'AWS Bedrock Region',
+            name: 'bedrockRegion',
+            type: 'string',
+            default: '',
+            placeholder: 'us-east-1',
+            description: 'AWS region for Bedrock (maps to credentials.region)',
+        },
         {
             displayName: 'AWS Access Key ID (Optional)',
             name: 'bedrockAccessKeyId',
@@ -97,15 +149,8 @@ export class LimescapeDocsApi implements ICredentialType {
             type: 'string',
             typeOptions: { password: true },
             default: '',
-            description: 'AWS Secret Access Key for Bedrock (maps to credentials.secretAccessKey)',
-        },
-        {
-            displayName: 'AWS Bedrock Region',
-            name: 'bedrockRegion',
-            type: 'string',
-            default: '',
-            placeholder: 'us-east-1',
-            description: 'AWS region for Bedrock (maps to credentials.region)',
+            description:
+                'AWS Secret Access Key for Bedrock (maps to credentials.secretAccessKey)',
         },
         {
             displayName: 'AWS Session Token (Optional)',
@@ -113,7 +158,8 @@ export class LimescapeDocsApi implements ICredentialType {
             type: 'string',
             typeOptions: { password: true },
             default: '',
-            description: 'Optional AWS Session Token for temporary Bedrock credentials (maps to credentials.sessionToken)',
+            description:
+                'Optional AWS Session Token for temporary Bedrock credentials (maps to credentials.sessionToken)',
         },
     ];
 }
