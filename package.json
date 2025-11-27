@@ -52,7 +52,11 @@
       "dist/nodes/LimescapeDocs/LimescapeDocs.node.js"
     ]
   },
+  "peerDependencies": {
+    "limescape-docs": "*"
+  },  
   "devDependencies": {
+    "limescape-docs": "file:/home/rodger/truelime-git-projects/limescape-ai-limescape-docs/limescape-docs-1.1.21.tgz",
     "@eslint/eslintrc": "^3.3.1",
     "@eslint/js": "^9.39.1",
     "@typescript-eslint/parser": "^8.48.0",
@@ -60,14 +64,13 @@
     "eslint-plugin-n8n-nodes-base": "^1.16.4",
     "globals": "^16.5.0",
     "gulp": "^5.0.1",
-    "n8n-core": "^1.121.0",
-    "n8n-workflow": "^1.119.0",
-    "prettier": "^3.6.2",
+    "n8n-core": "^1.121.1",
+    "n8n-workflow": "^1.119.1",
+    "prettier": "^3.7.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {
     "@n8n/node-cli": "^0.17.0",
-    "limescape-docs": "file:limescape-docs-1.1.21.tgz",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }
