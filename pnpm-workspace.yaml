@@ -7,4 +7,3 @@ onlyBuiltDependencies:
   - sharp
   - ssh2
   - tesseract.js
-  - zerox
