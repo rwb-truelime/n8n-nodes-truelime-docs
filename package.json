@@ -33,7 +33,8 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "build": "tsc && gulp build:icons",
-    "dev": "tsc --watch",
+    "build:watch": "n8n-node build --watch",
+    "dev": "n8n-node dev",
     "format": "prettier nodes credentials --write",
     "lint": "eslint nodes credentials package.json",
     "lintfix": "eslint nodes credentials package.json --fix",
