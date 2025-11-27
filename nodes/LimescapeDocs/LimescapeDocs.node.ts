@@ -161,7 +161,8 @@ const mapCredentialsForProvider = (
         }
         return {
             apiKey: credentials.azureAifApiKey as string,
-            baseUrl: credentials.azureAifBaseUrl as string,
+            // SDK expects `baseURL` (uppercase URL). Use exact key.
+            baseURL: credentials.azureAifBaseUrl as string,
         } as ModelCredentials;
     }
 
