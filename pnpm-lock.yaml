@@ -11,9 +11,6 @@ importers:
       '@n8n/node-cli':
         specifier: ^0.17.0
         version: 0.17.0(@typescript-eslint/utils@8.48.0(eslint@9.39.1)(typescript@5.9.3))(eslint@9.39.1)(typescript@5.9.3)
-      limescape-docs:
-        specifier: file:/home/rodger/truelime-git-projects/limescape-ai-limescape-docs/limescape-docs-1.1.21.tgz
-        version: file:../limescape-ai-limescape-docs/limescape-docs-1.1.21.tgz(ws@8.18.3)(zod@3.25.67)
       xlsx:
         specifier: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
         version: https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz
@@ -39,6 +36,9 @@ importers:
       gulp:
         specifier: ^5.0.1
         version: 5.0.1
+      limescape-docs:
+        specifier: file:/home/rodger/truelime-git-projects/limescape-ai-limescape-docs/limescape-docs-1.1.21.tgz
+        version: file:../limescape-ai-limescape-docs/limescape-docs-1.1.21.tgz(ws@8.18.3)(zod@3.25.67)
       n8n-core:
         specifier: ^1.121.1
         version: 1.121.1(@opentelemetry/api@1.9.0)(@opentelemetry/sdk-trace-base@1.30.1(@opentelemetry/api@1.9.0))(openai@6.9.1(ws@8.18.3)(zod@3.25.67))
@@ -2547,7 +2547,7 @@ packages:
     engines: {node: '>=14'}
 
   limescape-docs@file:../limescape-ai-limescape-docs/limescape-docs-1.1.21.tgz:
-    resolution: {integrity: sha512-RRIgkDVbYidS+8cjrNwzoEe/uc1GxQ9YrNAfZ4NhG+jGaeWN/x0n4CZJZdgGDNssaEA5wmk8fj8V57L0LOJL9w==, tarball: file:../limescape-ai-limescape-docs/limescape-docs-1.1.21.tgz}
+    resolution: {integrity: sha512-YMR7gV6vzKVY/GjK2rBQ5dY2oDETYDL5b0sB8ZFIJtcPQFd4FIKmIHh7ouuYZntjG4K/vAdvALPMCnpwu/a6oA==, tarball: file:../limescape-ai-limescape-docs/limescape-docs-1.1.21.tgz}
     version: 1.1.21
 
   locate-path@6.0.0:
