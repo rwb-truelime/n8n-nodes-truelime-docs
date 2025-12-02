@@ -1,36 +1,35 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 import {
-  INodeType,
-  INodeTypeDescription,
-  IExecuteFunctions,
-  INodeExecutionData,
-  IDataObject,
-  NodeOperationError,
-  IBinaryData,
+    IExecuteFunctions,
+    INodeExecutionData,
+    NodeOperationError,
+    IDataObject,
+    IBinaryData,
+    INodeType,
+    INodeTypeDescription,
+    ILoadOptionsFunctions,
+    INodePropertyOptions,
 } from 'n8n-workflow';
 import {
     limescapeDocs,
     LimescapeDocsArgs,
     ModelCredentials,
-    ErrorMode as LimescapeErrorMode,
-    ModelProvider as LimescapeModelProvider,
     LLMParams,
+    ModelProvider as LimescapeModelProvider,
+    ErrorMode as LimescapeErrorMode,
 } from 'limescape-docs';
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-
 // Helper function to safely create a temporary directory if needed
 const ensureDirSync = (dirPath: string) => {
-  try {
-      fs.mkdirSync(dirPath, { recursive: true });
-  } catch (err: any) {
-      if (err.code !== 'EEXIST') {
-          throw err; // Re-throw if it's not a "directory already exists" error
-      }
-  }
+    try {
+        fs.mkdirSync(dirPath, { recursive: true });
+    } catch (err: any) {
+        if (err.code !== 'EEXIST') {
+            throw err;
+        }
+    }
 };
-
-// Helper to parse comma-separated numbers/ranges into page numbers
 const parsePages = (pagesStr: string | undefined): number[] | undefined => {
     if (!pagesStr) return undefined;
 
@@ -358,40 +357,29 @@ export class LimescapeDocs implements INodeType {
                   { name: 'Google Vertex', value: LimescapeModelProvider.VERTEX },
                   { name: 'AWS Bedrock', value: LimescapeModelProvider.BEDROCK },
               ],
-              default: LimescapeModelProvider.OPENAI,
+              default: LimescapeModelProvider.AZURE,
               required: true,
               description: 'The LLM provider to use for processing',
               hint: 'Select the AI provider (e.g., OpenAI). Default: OpenAI. Required field.',
           },
           {
-              displayName: 'Model',
+              displayName: 'Is Gemini 3',
+              name: 'isGemini3',
+              type: 'hidden',
+              default: '={{ ($parameter["customModel"] || $parameter["model"] || "").toLowerCase().startsWith("gemini-3") }}',
+          },
+          {
+              displayName: 'Model Name or ID',
               name: 'model',
               type: 'options',
-              // Alphabetized options
-              options: [
-                                { name: 'Claude 4 Haiku (Bedrock)', value: 'anthropic.claude-4-haiku-20250601-v1:0' },
-                                { name: 'Claude 4 Opus (Bedrock)', value: 'anthropic.claude-4-opus-20250415-v1:0' },
-                                { name: 'Claude 4 Sonnet (Bedrock)', value: 'anthropic.claude-4-sonnet-20250601-v1:0' },
-                                { name: 'Claude 4.1 Haiku (Bedrock)', value: 'anthropic.claude-4.1-haiku-20250810-v1:0' },
-                                { name: 'Claude 4.1 Opus (Bedrock)', value: 'anthropic.claude-4.1-opus-20250810-v1:0' },
-                                { name: 'Claude 4.1 Sonnet (Bedrock)', value: 'anthropic.claude-4.1-sonnet-20250810-v1:0' },
-                                { name: 'Claude 4.5 Haiku (Bedrock)', value: 'anthropic.claude-4.5-haiku-20251020-v1:0' },
-                                { name: 'Claude 4.5 Sonnet (Bedrock)', value: 'anthropic.claude-4.5-sonnet-20250929-v1:0' },
-                                { name: 'Gemini 2.5 Flash (Google)', value: 'gemini-2.5-flash' },
-                                { name: 'Gemini 2.5 Flash Lite (Google)', value: 'gemini-2.5-flash-lite' },
-                                { name: 'Gemini 2.5 Pro (Google)', value: 'gemini-2.5-pro' },
-                                { name: 'Gemini 3 Pro Preview (Google)', value: 'gemini-3-pro-preview' },
-                                { name: 'GPT-4.1 (OpenAI/Azure)', value: 'gpt-4.1' },
-                                { name: 'GPT-4.1 Mini (OpenAI/Azure)', value: 'gpt-4.1-mini' },
-                                { name: 'GPT-4o (OpenAI/Azure)', value: 'gpt-4o' },
-                                { name: 'GPT-4o Mini (OpenAI/Azure)', value: 'gpt-4o-mini' },
-                                { name: 'GPT-5.1 (OpenAI/Azure)', value: 'gpt-5.1' },
-                                { name: 'GPT-5.1 Mini (OpenAI/Azure)', value: 'gpt-5.1-mini' },
-                                { name: 'GPT-5.1 Standard (OpenAI/Azure)', value: 'gpt-5.1-standard' },
-              ],
+              options: [],
+              typeOptions: {
+                  loadOptionsMethod: 'getModelsForProvider',
+                  loadOptionsDependsOn: ['modelProvider'],
+              },
               default: 'gpt-5.1-standard',
-              description: 'The specific model identifier for the selected provider',
-              hint: 'Choose the AI model. Default: gpt-5.1-standard. Can be overridden by Custom Model.',
+              description: 'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+              hint: 'Filtered by provider. Can be overridden by Custom Model.',
           },
           {
               displayName: 'Custom Model',
@@ -402,6 +390,48 @@ export class LimescapeDocs implements INodeType {
               placeholder: 'e.g., gpt-5.1 or specific Azure deployment ID',
               hint: 'Optional: Enter a specific model ID to override the Model selection. Leave empty to use the selected Model.',
           },
+          {
+              displayName: 'Gemini 3 Options',
+              name: 'gemini3Options',
+              type: 'collection',
+              placeholder: 'Add Gemini 3 Option',
+              default: {},
+              description: 'Options specific to Google/Vertex Gemini 3 models',
+              hint: 'Available only for Gemini 3 Pro Preview models.',
+              displayOptions: {
+                  show: {
+                      isGemini3: [true],
+                  },
+              },
+              options: [
+                  {
+                      displayName: 'Thinking Level',
+                      name: 'thinkingLevel',
+                      type: 'options',
+                      options: [
+                          { name: 'Low', value: 'low' },
+                          { name: 'High', value: 'high' },
+                      ],
+                      default: 'low',
+                      description: 'Controls depth of reasoning for Gemini 3 models',
+                      hint: 'Applied only for Gemini 3 models; availability may vary by region/project.',
+                  },
+                  {
+                      displayName: 'Media Resolution',
+                      name: 'mediaResolution',
+                      type: 'options',
+                      options: [
+                          { name: 'Low', value: 'low' },
+                          { name: 'Medium', value: 'medium' },
+                          { name: 'High', value: 'high' },
+                      ],
+                      default: 'medium',
+                      description: 'Controls image resolution used by Gemini 3 models',
+                      hint: 'Higher resolutions may improve OCR quality at higher cost.',
+                  },
+              ],
+          },
+          
            {
               displayName: 'Schema (Optional)',
               name: 'schema',
@@ -512,7 +542,7 @@ export class LimescapeDocs implements INodeType {
                                          { name: 'Gemini 3 Pro Preview (Google)', value: 'gemini-3-pro-preview' },
                                          { name: 'GPT-4o (OpenAI/Azure)', value: 'gpt-4o' },
                                          { name: 'GPT-5.1 (OpenAI/Azure)', value: 'gpt-5.1' },
-                                     ], default: 'gpt-4o', description: 'Override model for extraction step', hint: 'Optional: Select a different AI model just for extraction. Default: gpt-4o.' },
+                                     ], default: 'gpt-5.1', description: 'Override model for extraction step', hint: 'Optional: Select a different AI model just for extraction. Default: gpt-5.1.' },
                    { displayName: 'Custom Extraction Model', name: 'customExtractionModel', type: 'string', default: '', description: 'Override custom model for extraction step', hint: 'Optional: Enter a specific model ID to override the Extraction Model. Default: empty.' },
                    { displayName: 'Extraction Prompt', name: 'extractionPrompt', type: 'string', default: '', typeOptions: { rows: 4 }, description: 'Specific prompt for the extraction step', hint: 'Optional: Provide a prompt specifically for the extraction step. Default: empty (use main prompt or schema).' },
               ],
@@ -536,51 +566,7 @@ export class LimescapeDocs implements INodeType {
                   { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, description: 'Nucleus sampling parameter', hint: 'Alternative to temperature for controlling randomness. Default: 1.' },
               ],
           },
-          {
-              displayName: 'Gemini 3 Options',
-              name: 'gemini3Options',
-              type: 'collection',
-              placeholder: 'Add Gemini 3 Option',
-              default: {},
-              description: 'Options specific to Google/Vertex Gemini 3 models',
-              hint: 'Available only for Gemini 3 Pro Preview models.',
-              displayOptions: {
-                  show: {
-                      modelProvider: [
-                          LimescapeModelProvider.GOOGLE,
-                          LimescapeModelProvider.VERTEX,
-                      ],
-                  },
-              },
-              options: [
-                  {
-                      displayName: 'Thinking Level',
-                      name: 'thinkingLevel',
-                      type: 'options',
-                      options: [
-                          { name: 'Low', value: 'low' },
-                          { name: 'High', value: 'high' },
-                      ],
-                      default: 'low',
-                      description: 'Controls depth of reasoning for Gemini 3 models',
-                      hint: 'Applied only for Gemini 3 models; availability may vary by region/project.',
-                  },
-                  {
-                      displayName: 'Media Resolution',
-                      name: 'mediaResolution',
-                      type: 'options',
-                      options: [
-                          { name: 'Low', value: 'low' },
-                          { name: 'Medium', value: 'medium' },
-                          { name: 'High', value: 'high' },
-                      ],
-                      default: 'medium',
-                      description: 'Controls image resolution used by Gemini 3 models',
-                      hint: 'Higher resolutions may improve OCR quality at higher cost.',
-                  },
-              ],
-          },
-           {
+              {
               displayName: 'Extraction LLM Parameters',
               name: 'extractionLlmParameters',
               type: 'collection',
@@ -601,6 +587,66 @@ export class LimescapeDocs implements INodeType {
           },
       ],
   };
+
+    methods = {
+        loadOptions: {
+            async getModelsForProvider(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+                const provider = this.getCurrentNodeParameter('modelProvider') as string;
+                const by = (entries: Array<INodePropertyOptions>) => entries;
+                if (provider === LimescapeModelProvider.OPENAI || provider === LimescapeModelProvider.AZURE) {
+                    return by([
+                        { name: 'GPT-5.1', value: 'gpt-5.1' },
+                        { name: 'GPT-5.1 Mini', value: 'gpt-5.1-mini' },
+                        { name: 'GPT-5.1 Standard', value: 'gpt-5.1-standard' },
+                        { name: 'GPT-4.1', value: 'gpt-4.1' },
+                        { name: 'GPT-4.1 Mini', value: 'gpt-4.1-mini' },
+                        { name: 'GPT-4o Mini', value: 'gpt-4o-mini' },
+                        { name: 'GPT-4o', value: 'gpt-4o' },
+                    ]);
+                }
+                if (provider === LimescapeModelProvider.GOOGLE) {
+                    return by([
+                        { name: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
+                        { name: 'Gemini 2.5 Flash', value: 'gemini-2.5-flash' },
+                        { name: 'Gemini 3 Pro Preview', value: 'gemini-3-pro-preview' },
+                    ]);
+                }
+                if (provider === LimescapeModelProvider.AZURE_AIF) {
+                    return by([
+                        { name: 'GPT-5.1', value: 'gpt-5.1' },
+                        { name: 'GPT-5.1 Mini', value: 'gpt-5.1-mini' },
+                        { name: 'GPT-5.1 Standard', value: 'gpt-5.1-standard' },
+                        { name: 'GPT-4.1', value: 'gpt-4.1' },
+                        { name: 'GPT-4.1 Mini', value: 'gpt-4.1-mini' },
+                        { name: 'GPT-4o Mini', value: 'gpt-4o-mini' },
+                        { name: 'GPT-4o', value: 'gpt-4o' },
+                        { name: 'Claude 4.5 Sonnet', value: 'anthropic.claude-4.5-sonnet-20250929-v1:0' },
+                        { name: 'Claude 4.1 Sonnet', value: 'anthropic.claude-4.1-sonnet-20250810-v1:0' },
+                        { name: 'Claude 4 Opus', value: 'anthropic.claude-4-opus-20250415-v1:0' },
+                        { name: 'Claude 4 Haiku', value: 'anthropic.claude-4-haiku-20250601-v1:0' },
+                    ]);
+                }
+                if (provider === LimescapeModelProvider.VERTEX) {
+                    return by([
+                        { name: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
+                        { name: 'Gemini 2.5 Flash', value: 'gemini-2.5-flash' },
+                        { name: 'Gemini 3 Pro Preview', value: 'gemini-3-pro-preview' },
+                        { name: 'Claude 4.5 Sonnet (Bedrock)', value: 'anthropic.claude-4.5-sonnet-20250929-v1:0' },
+                        { name: 'Claude 4.1 Sonnet (Bedrock)', value: 'anthropic.claude-4.1-sonnet-20250810-v1:0' },
+                    ]);
+                }
+                if (provider === LimescapeModelProvider.BEDROCK) {
+                    return by([
+                        { name: 'Claude 4.5 Sonnet', value: 'anthropic.claude-4.5-sonnet-20250929-v1:0' },
+                        { name: 'Claude 4.1 Sonnet', value: 'anthropic.claude-4.1-sonnet-20250810-v1:0' },
+                        { name: 'Claude 4 Opus', value: 'anthropic.claude-4-opus-20250415-v1:0' },
+                        { name: 'Claude 4 Haiku', value: 'anthropic.claude-4-haiku-20250601-v1:0' },
+                    ]);
+                }
+                return by([{ name: 'GPT-4o Mini', value: 'gpt-4o-mini' }]);
+            },
+        },
+    };
 
   async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
       const items = this.getInputData();
