@@ -5,7 +5,7 @@ Purpose: Help AI coding agents work productively in this repository by documenti
 ## Big Picture
 - Node package: Custom n8n community node providing OCR & AI-driven document extraction via `limescape-docs`.
 - Primary components:
-  - `nodes/LimescapeDocs/LimescapeDocs.node.ts`: Node implementation, parameters, execution, data shaping.
+  - `nodes/LimescapeDocs/LimescapeDocs.node.ts`: Versioned entry node (Full Versioning for majors), parameters, execution, data shaping.
   - `credentials/LimescapeDocsApi.credentials.ts`: Credentials schema mapped to multiple model providers.
   - `icons/` + `gulpfile.js`: Icon build pipeline (`gulp build:icons`).
   - `package.json`: Scripts, n8n manifest (`n8n.credentials` and `n8n.nodes`), dependency on a local tarball `limescape-docs-1.1.21.tgz`.
@@ -21,6 +21,15 @@ Purpose: Help AI coding agents work productively in this repository by documenti
   - `buildLimescapeArgsForItem(...)`: Assemble `filePath`, model/provider, extraction options, `llmParams`.
 - Processing: Calls `limescapeDocs(args)` (from `limescape-docs`) with constructed options; returns structured data and optionally binary artifacts.
 - Outputs: Single main output; success pathway only. Errors use `NodeOperationError` with `itemIndex` context.
+
+## Versioning Conventions
+- Hybrid versioning model matching n8n core:
+  - Light versioning for minor increments inside a major implementation: use version arrays in the version implementation file, e.g. `version: [1.21, 1.22, 1.23]` in `v1`.
+  - Full versioning for breaking changes: use `VersionedNodeType` entry with `nodeVersions` mapping majors (and their minors) to implementations, e.g. `1.21/1.22/1.23 → V1`, `2.0/2.1 → V2`.
+- Default version selection:
+  - Set `defaultVersion` in the entry node to control what new nodes use by default without breaking existing workflows.
+- DisplayOptions and `@version`:
+  - Use `@version` checks inside properties to show/hide fields across minor versions in the same major implementation.
 
 ## Project Conventions
 - Provider selection: `modelProvider` is an enum from `limescape-docs` (`OPENAI`, `AZURE`, `AZURE_AIF`, `GOOGLE`, `VERTEX`, `BEDROCK`). Choose model via `model` or override via `customModel`.
@@ -79,7 +88,7 @@ Purpose: Help AI coding agents work productively in this repository by documenti
 - Use `pnpm lint` and `eslint-plugin-n8n-nodes-base` rules to catch n8n-specific issues.
 
 ## Key Files
-- `nodes/LimescapeDocs/LimescapeDocs.node.ts`: Node parameters, args assembly, execution.
+- `nodes/LimescapeDocs/LimescapeDocs.node.ts`: Versioned entry (Full Versioning) with `nodeVersions` map and `defaultVersion`.
 - `credentials/LimescapeDocsApi.credentials.ts`: Provider credentials inputs.
 - `package.json`: Scripts, `n8n` manifest, dependency on `limescape-docs` tarball.
 - `gulpfile.js`, `icons/`: Icon build.

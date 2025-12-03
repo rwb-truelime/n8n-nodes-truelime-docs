@@ -1,7 +1,7 @@
 {
   "name": "n8n-nodes-limescape-docs",
-  "version": "1.1.21",
-  "description": "N8N node for Zerox OCR & Document Extraction",
+  "version": "1.22.0",
+  "description": "N8N node for Limescape Docs OCR & Document Extraction",
   "keywords": [
     "n8n-community-node-package",
     "vision",
@@ -54,19 +54,19 @@
   },
   "peerDependencies": {
     "limescape-docs": "*"
-  },  
+  },
   "devDependencies": {
-    "limescape-docs": "file:/home/rodger/truelime-git-projects/limescape-ai-limescape-docs/limescape-docs-1.1.21.tgz",
-    "@eslint/eslintrc": "^3.3.1",
+    "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^9.39.1",
-    "@typescript-eslint/parser": "^8.48.0",
+    "@typescript-eslint/parser": "^8.48.1",
     "eslint": "^9.39.1",
     "eslint-plugin-n8n-nodes-base": "^1.16.4",
     "globals": "^16.5.0",
     "gulp": "^5.0.1",
-    "n8n-core": "^1.121.1",
-    "n8n-workflow": "^1.119.1",
-    "prettier": "^3.7.0",
+    "limescape-docs": "file:/home/rodger/truelime-git-projects/limescape-ai-limescape-docs/limescape-docs-1.22.0.tgz",
+    "n8n-core": "^1.122.0",
+    "n8n-workflow": "^1.120.0",
+    "prettier": "^3.7.4",
     "typescript": "^5.9.3"
   },
   "dependencies": {

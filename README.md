@@ -1,8 +1,8 @@
 ![Banner image](https://user-images.githubusercontent.com/10284570/173569848-c624317f-42b1-45a6-ab09-f0ea3c247648.png)
 
-# n8n-nodes-starter
+# n8n-nodes-truelime-docs
 
-This starter repository helps you build custom integrations for [n8n](https://n8n.io). It includes example nodes, credentials, the node linter, and all the tooling you need to get started.
+Custom n8n community node providing OCR & AI-driven document extraction via `limescape-docs`.
 
 ## Quick Start
 
@@ -23,24 +23,16 @@ npm run dev
 
 This starts n8n with your nodes loaded and hot reload enabled.
 
-## What's Included
+## Versioning
 
-This starter repository includes two example nodes to learn from:
+We follow n8n’s hybrid versioning model:
+- **Light versioning (minor updates)**: Inside a major implementation (e.g., V1), we list minor versions in the implementation file, e.g. `version: [1.21, 1.22, 1.23]`. Use `@version` in `displayOptions` to show/hide properties across minors.
+- **Full versioning (major updates)**: The entry node (`nodes/LimescapeDocs/LimescapeDocs.node.ts`) extends `VersionedNodeType` and maps versions to implementations, e.g. `1.21/1.22/1.23 → V1`, `2.0/2.1 → V2`. Set `defaultVersion` to control the version used for new nodes.
 
-- **[Example Node](nodes/Example/)** - A simple starter node that shows the basic structure with a custom `execute` method
-- **[GitHub Issues Node](nodes/GithubIssues/)** - A complete, production-ready example built using the **declarative style**:
-  - **Low-code approach** - Define operations declaratively without writing request logic
-  - Multiple resources (Issues, Comments)
-  - Multiple operations (Get, Get All, Create)
-  - Two authentication methods (OAuth2 and Personal Access Token)
-  - List search functionality for dynamic dropdowns
-  - Proper error handling and typing
-  - Ideal for HTTP API-based integrations
+This ensures existing workflows keep their saved minor version behavior, while major changes are isolated in a new implementation.
 
-> [!TIP]
-> The declarative/low-code style (used in GitHub Issues) is the recommended approach for building nodes that interact with HTTP APIs. It significantly reduces boilerplate code and handles requests automatically.
-
-Browse these examples to understand both approaches, then modify them or create your own.
+Reference example from n8n:
+- https://github.com/n8n-io/n8n/tree/master/packages/%40n8n/nodes-langchain/nodes/agents/Agent
 
 ## Finding Inspiration
 
@@ -70,7 +62,7 @@ Before you begin, install the following on your development machine:
 > [!NOTE]
 > The `@n8n/node-cli` is included as a dev dependency and will be installed automatically when you run `npm install`. The CLI includes n8n for local development, so you don't need to install n8n globally.
 
-## Getting Started with this Starter
+## Getting Started
 
 Follow these steps to create your own n8n community node package:
 
@@ -100,7 +92,7 @@ Browse the example nodes in [nodes/](nodes/) and [credentials/](credentials/) to
 
 ### 4. Build Your Node
 
-Edit the example nodes to fit your use case, or create new node files by copying the structure from [nodes/Example/](nodes/Example/).
+Edit the `LimescapeDocs` node or add new providers as needed. See `credentials/LimescapeDocsApi.credentials.ts` and `nodes/LimescapeDocs/`.
 
 > [!TIP]
 > If you want to scaffold a completely new node package, use `npm create @n8n/node` to start fresh with the CLI's interactive generator.
@@ -114,7 +106,7 @@ Update `package.json` with your details:
 - `repository` - Your repository URL
 - `description` - What your node does
 
-Make sure your node is registered in the `n8n.nodes` array.
+Ensure your node and credentials are registered in the `n8n` manifest and point to `dist/**` outputs.
 
 ### 6. Develop and Test Locally
 

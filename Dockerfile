@@ -11,9 +11,9 @@ RUN npm i -g langfuse-langchain --loglevel verbose
 
 # Install the custom nodes
 RUN mkdir /home/node/.n8n/nodes
-COPY n8n-nodes-limescape-docs-1.1.21.tgz /home/node/.n8n/nodes/n8n-nodes-limescape-docs-1.1.21.tgz
-COPY limescape-docs-1.1.21.tgz /home/node/.n8n/nodes/limescape-docs-1.1.21.tgz
-RUN cd /home/node/.n8n/nodes/ && npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz --loglevel verbose && npm install ./limescape-docs-1.1.21.tgz --loglevel verbose && npm install ./n8n-nodes-limescape-docs-1.1.21.tgz --loglevel verbose && npm install n8n-nodes-eml --loglevel verbose n8n-nodes-run-node-with-credentials-x --loglevel verbose && chown -R node:node /home/node/.n8n/nodes && rm -rf /home/node/.n8n/nodes/*.tgz
+COPY n8n-nodes-limescape-docs-1.22.0.tgz /home/node/.n8n/nodes/n8n-nodes-limescape-docs-1.22.0.tgz
+COPY limescape-docs-1.22.0.tgz /home/node/.n8n/nodes/limescape-docs-1.22.0.tgz
+RUN cd /home/node/.n8n/nodes/ && npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz --loglevel verbose && npm install ./limescape-docs-1.22.0.tgz --loglevel verbose && npm install ./n8n-nodes-limescape-docs-1.22.0.tgz --loglevel verbose && npm install n8n-nodes-eml --loglevel verbose n8n-nodes-run-node-with-credentials-x --loglevel verbose && chown -R node:node /home/node/.n8n/nodes && rm -rf /home/node/.n8n/nodes/*.tgz
 
 # Switch back to the node homedir and user
 WORKDIR /home/node

@@ -1,7 +1,7 @@
 {
-  "node": "n8n-nodes-base.limescapeDocs",
-  "nodeVersion": "1.1.21",
-  "codexVersion": "1.1.21",
+  "node": "n8n-nodes-limescape-docs.limescapeDocs",
+  "nodeVersion": "1.22",
+  "codexVersion": "1.0",
   "categories": [
     "Utility",
     "Productivity"
