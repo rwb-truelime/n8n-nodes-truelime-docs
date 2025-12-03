@@ -16,7 +16,7 @@ const compat = new FlatCompat({
 });
 
 export default defineConfig([
-    globalIgnores(["**/.eslintrc.js", "**/*.js", "**/node_modules/**/*", "**/dist/**/*"]),
+    globalIgnores(["**/.eslintrc.js", "**/*.js", "**/*.mjs", "**/node_modules/**/*", "**/dist/**/*"]),
     {
         languageOptions: {
             globals: {

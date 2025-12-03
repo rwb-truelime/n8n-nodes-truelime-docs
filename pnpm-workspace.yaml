@@ -3,7 +3,7 @@ onlyBuiltDependencies:
   - cpu-features
   - eslint-plugin-n8n-nodes-base
   - limescape-docs
-  - limescape-docs
   - sharp
   - ssh2
   - tesseract.js
+  - unrs-resolver
