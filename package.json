@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-limescape-docs",
-  "version": "1.22.0",
+  "version": "1.22.1",
   "description": "N8N node for Limescape Docs OCR & Document Extraction",
   "keywords": [
     "n8n-community-node-package",
@@ -63,8 +63,8 @@
     "eslint-plugin-n8n-nodes-base": "^1.16.4",
     "globals": "^16.5.0",
     "gulp": "^5.0.1",
-    "limescape-docs": "file:/home/rodger/truelime-git-projects/limescape-ai-limescape-docs/limescape-docs-1.22.0.tgz",
-    "n8n-core": "^1.122.0",
+    "limescape-docs": "file:/home/rodger/truelime-git-projects/limescape-ai-limescape-docs/limescape-docs-1.22.1.tgz",
+    "n8n-core": "^1.122.1",
     "n8n-workflow": "^1.120.0",
     "prettier": "^3.7.4",
     "typescript": "^5.9.3"
