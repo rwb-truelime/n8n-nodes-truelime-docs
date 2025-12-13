@@ -75,7 +75,7 @@ export class LimescapeDocs extends VersionedNodeType {
             group: ['transform'],
             subtitle: '={{$parameter["operation"]}}',
             description: 'OCR & Document Extraction using AI models via Limescape Docs',
-            defaultVersion: 1.22,  // ← UPDATE THIS when adding new versions
+            defaultVersion: 1.23,  // ← UPDATE THIS when adding new versions
         };
 
         // =====================================================================
@@ -86,7 +86,8 @@ export class LimescapeDocs extends VersionedNodeType {
         const nodeVersions: IVersionedNodeType['nodeVersions'] = {
             1: new LimescapeDocsV1(baseDescription),
             1.21: new LimescapeDocsV1(baseDescription),
-            1.22: new LimescapeDocsV1(baseDescription)
+            1.22: new LimescapeDocsV1(baseDescription),
+            1.23: new LimescapeDocsV1(baseDescription)
             // Future versions:
             // 1.23: new LimescapeDocsV1(baseDescription),  // If backward compatible
             // 2: new LimescapeDocsV2(baseDescription),     // If breaking changes

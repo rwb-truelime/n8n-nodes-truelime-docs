@@ -1,6 +1,6 @@
 {
   "node": "n8n-nodes-limescape-docs.limescapeDocs",
-  "nodeVersion": "1.22",
+  "nodeVersion": "1.23",
   "codexVersion": "1.0",
   "categories": [
     "Utility",
