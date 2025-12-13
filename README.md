@@ -1,239 +1,197 @@
 ![Banner image](https://user-images.githubusercontent.com/10284570/173569848-c624317f-42b1-45a6-ab09-f0ea3c247648.png)
 
-# n8n-nodes-truelime-docs
+# n8n-nodes-limescape-docs
+
+Custom n8n community node providing OCR & AI-driven document extraction via [\`limescape-docs\`](https://limescape.ai).
 
-Custom n8n community node providing OCR & AI-driven document extraction via `limescape-docs`.
+## Features
 
-## Quick Start
+- **Multi-Provider Support**: Works with OpenAI, Azure OpenAI, Azure AI Foundry, Google Gemini, Google Vertex AI, and AWS Bedrock
+- **OCR & Document Processing**: Convert PDFs and images to structured text using vision models
+- **Schema-Based Extraction**: Extract structured data from documents using JSON schemas
+- **Page-by-Page Extraction**: Process each page as a separate LLM call to prevent hallucination on large documents
+- **Flexible Configuration**: Extensive options for image processing, concurrency, and LLM parameters
+
+## Installation
+
+### In n8n (Recommended)
+
+1. Go to **Settings** > **Community Nodes**
+2. Select **Install**
+3. Enter \`n8n-nodes-limescape-docs\`
+4. Select **Install**
+
+### Manual Installation
+
+\`\`\`bash
+pnpm add n8n-nodes-limescape-docs
+\`\`\`
+
+> **Note**: This package uses pnpm as the package manager.
+
+## Credentials Setup
+
+Before using the node, configure credentials for your AI provider(s) in n8n:
 
-> [!TIP]
-> **New to building n8n nodes?** The fastest way to get started is with `npm create @n8n/node`. This command scaffolds a complete node package for you using the [@n8n/node-cli](https://www.npmjs.com/package/@n8n/node-cli).
+1. Go to **Credentials** > **New Credential**
+2. Search for **Limescape Docs Credentials API**
+3. Fill in the credentials for your provider(s):
 
-**To create a new node package from scratch:**
+| Provider | Required Fields |
+|----------|-----------------|
+| **OpenAI** | API Key |
+| **Azure OpenAI** | API Key, Endpoint, (optional) API Version |
+| **Azure AI Foundry** | Base URL, API Key |
+| **Google Gemini** | API Key |
+| **Google Vertex AI** | Service Account JSON, Location |
+| **AWS Bedrock** | Region, (optional) Access Key ID, Secret Access Key, Session Token |
 
-```bash
-npm create @n8n/node
-```
+## Node Configuration
 
-**Already using this starter? Start developing with:**
+### Basic Settings
+
+| Option | Description |
+|--------|-------------|
+| **Model Provider** | Select your AI provider |
+| **Model** | Choose from preset models or use custom |
+| **Custom Model** | Override with a specific model ID |
+| **Schema** | JSON schema for structured data extraction |
+| **Input Binary Field** | Name of the binary property containing the file (default: \`data\`) |
+
+### Processing Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| Cleanup Temp Files | \`true\` | Automatically delete temporary files after processing |
+| Concurrency | \`10\` | Maximum parallel operations within the processor |
+| Correct Orientation | \`true\` | Auto-correct document image orientation |
+| Direct Image Extraction | \`false\` | Extract from images without full OCR |
+| Enable Hybrid Extraction | \`false\` | Use combined OCR/extraction techniques |
+| Extract Only | \`false\` | Skip OCR and only perform extraction |
+| Extract Page-by-Page | \`false\` | Process each page as a separate LLM extraction call |
+| Extract Per Page Keys | \`[]\` | Schema keys to extract per page (top-level only) |
+| Image Density (DPI) | \`150\` | Resolution for image conversion |
+| Image Format | \`png\` | Intermediate image format (PNG or JPEG) |
+| Image Height (Pixels) | \`3072\` | Target height for image resizing |
+| Maintain Format | \`false\` | Preserve original formatting in markdown |
+| Max Image Size (MB) | \`15\` | Maximum size for images sent to LLM |
+| Max Retries | \`1\` | Retries for failed LLM calls |
+| Pages To Convert | \`""\` | Comma-separated page ranges (e.g., \`1,3-5\`) |
 
-```bash
-npm run dev
-```
+### Extraction Specifics
 
-This starts n8n with your nodes loaded and hot reload enabled.
-
-## Versioning
-
-We follow n8n’s hybrid versioning model:
-- **Light versioning (minor updates)**: Inside a major implementation (e.g., V1), we list minor versions in the implementation file, e.g. `version: [1.21, 1.22, 1.23]`. Use `@version` in `displayOptions` to show/hide properties across minors.
-- **Full versioning (major updates)**: The entry node (`nodes/LimescapeDocs/LimescapeDocs.node.ts`) extends `VersionedNodeType` and maps versions to implementations, e.g. `1.21/1.22/1.23 → V1`, `2.0/2.1 → V2`. Set `defaultVersion` to control the version used for new nodes.
-
-This ensures existing workflows keep their saved minor version behavior, while major changes are isolated in a new implementation.
-
-Reference example from n8n:
-- https://github.com/n8n-io/n8n/tree/master/packages/%40n8n/nodes-langchain/nodes/agents/Agent
-
-## Finding Inspiration
-
-Looking for more examples? Check out these resources:
-
-- **[npm Community Nodes](https://www.npmjs.com/search?q=keywords:n8n-community-node-package)** - Browse thousands of community-built nodes on npm using the `n8n-community-node-package` tag
-- **[n8n Built-in Nodes](https://github.com/n8n-io/n8n/tree/master/packages/nodes-base/nodes)** - Study the source code of n8n's official nodes for production-ready patterns and best practices
-- **[n8n Credentials](https://github.com/n8n-io/n8n/tree/master/packages/nodes-base/credentials)** - See how authentication is implemented for various services
-
-These are excellent resources to understand how to structure your nodes, handle different API patterns, and implement advanced features.
-
-## Prerequisites
-
-Before you begin, install the following on your development machine:
-
-### Required
-
-- **[Node.js](https://nodejs.org/)** (v22 or higher) and npm
-  - Linux/Mac/WSL: Install via [nvm](https://github.com/nvm-sh/nvm)
-  - Windows: Follow [Microsoft's NodeJS guide](https://learn.microsoft.com/en-us/windows/dev-environment/javascript/nodejs-on-windows)
-- **[git](https://git-scm.com/downloads)**
-
-### Recommended
-
-- Follow n8n's [development environment setup guide](https://docs.n8n.io/integrations/creating-nodes/build/node-development-environment/)
-
-> [!NOTE]
-> The `@n8n/node-cli` is included as a dev dependency and will be installed automatically when you run `npm install`. The CLI includes n8n for local development, so you don't need to install n8n globally.
-
-## Getting Started
-
-Follow these steps to create your own n8n community node package:
-
-### 1. Create Your Repository
-
-[Generate a new repository](https://github.com/n8n-io/n8n-nodes-starter/generate) from this template, then clone it:
-
-```bash
-git clone https://github.com/<your-organization>/<your-repo-name>.git
-cd <your-repo-name>
-```
-
-### 2. Install Dependencies
-
-```bash
-npm install
-```
-
-This installs all required dependencies including the `@n8n/node-cli`.
-
-### 3. Explore the Examples
-
-Browse the example nodes in [nodes/](nodes/) and [credentials/](credentials/) to understand the structure:
-
-- Start with [nodes/Example/](nodes/Example/) for a basic node
-- Study [nodes/GithubIssues/](nodes/GithubIssues/) for a real-world implementation
-
-### 4. Build Your Node
-
-Edit the `LimescapeDocs` node or add new providers as needed. See `credentials/LimescapeDocsApi.credentials.ts` and `nodes/LimescapeDocs/`.
-
-> [!TIP]
-> If you want to scaffold a completely new node package, use `npm create @n8n/node` to start fresh with the CLI's interactive generator.
-
-### 5. Configure Your Package
-
-Update `package.json` with your details:
-
-- `name` - Your package name (must start with `n8n-nodes-`)
-- `author` - Your name and email
-- `repository` - Your repository URL
-- `description` - What your node does
-
-Ensure your node and credentials are registered in the `n8n` manifest and point to `dist/**` outputs.
-
-### 6. Develop and Test Locally
-
-Start n8n with your node loaded:
-
-```bash
-npm run dev
-```
-
-This command runs `n8n-node dev` which:
-
-- Builds your node with watch mode
-- Starts n8n with your node available
-- Automatically rebuilds when you make changes
-- Opens n8n in your browser (usually http://localhost:5678)
-
-You can now test your node in n8n workflows!
-
-> [!NOTE]
-> Learn more about CLI commands in the [@n8n/node-cli documentation](https://www.npmjs.com/package/@n8n/node-cli).
-
-### 7. Lint Your Code
-
-Check for errors:
-
-```bash
-npm run lint
-```
-
-Auto-fix issues when possible:
-
-```bash
-npm run lint:fix
-```
-
-### 8. Build for Production
-
-When ready to publish:
-
-```bash
-npm run build
-```
-
-This compiles your TypeScript code to the `dist/` folder.
-
-### 9. Prepare for Publishing
-
-Before publishing:
-
-1. **Update documentation**: Replace this README with your node's documentation. Use [README_TEMPLATE.md](README_TEMPLATE.md) as a starting point.
-2. **Update the LICENSE**: Add your details to the [LICENSE](LICENSE.md) file.
-3. **Test thoroughly**: Ensure your node works in different scenarios.
-
-### 10. Publish to npm
-
-Publish your package to make it available to the n8n community:
-
-```bash
-npm publish
-```
-
-Learn more about [publishing to npm](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry).
-
-### 11. Submit for Verification (Optional)
-
-Get your node verified for n8n Cloud:
-
-1. Ensure your node meets the [requirements](https://docs.n8n.io/integrations/creating-nodes/deploy/submit-community-nodes/):
-   - Uses MIT license ✅ (included in this starter)
-   - No external package dependencies
-   - Follows n8n's design guidelines
-   - Passes quality and security review
-
-2. Submit through the [n8n Creator Portal](https://creators.n8n.io/nodes)
-
-**Benefits of verification:**
-
-- Available directly in n8n Cloud
-- Discoverable in the n8n nodes panel
-- Verified badge for quality assurance
-- Increased visibility in the n8n community
-
-## Available Scripts
-
-This starter includes several npm scripts to streamline development:
-
-| Script                | Description                                                      |
-| --------------------- | ---------------------------------------------------------------- |
-| `npm run dev`         | Start n8n with your node and watch for changes (runs `n8n-node dev`) |
-| `npm run build`       | Compile TypeScript to JavaScript for production (runs `n8n-node build`) |
-| `npm run build:watch` | Build in watch mode (auto-rebuild on changes)                    |
-| `npm run lint`        | Check your code for errors and style issues (runs `n8n-node lint`) |
-| `npm run lint:fix`    | Automatically fix linting issues when possible (runs `n8n-node lint --fix`) |
-| `npm run release`     | Create a new release (runs `n8n-node release`)                   |
-
-> [!TIP]
-> These scripts use the [@n8n/node-cli](https://www.npmjs.com/package/@n8n/node-cli) under the hood. You can also run CLI commands directly, e.g., `npx n8n-node dev`.
-
-## Troubleshooting
-
-### My node doesn't appear in n8n
-
-1. Make sure you ran `npm install` to install dependencies
-2. Check that your node is listed in `package.json` under `n8n.nodes`
-3. Restart the dev server with `npm run dev`
-4. Check the console for any error messages
-
-### Linting errors
-
-Run `npm run lint:fix` to automatically fix most common issues. For remaining errors, check the [n8n node development guidelines](https://docs.n8n.io/integrations/creating-nodes/).
-
-### TypeScript errors
-
-Make sure you're using Node.js v22 or higher and have run `npm install` to get all type definitions.
+Override model/provider specifically for the extraction step:
+
+| Option | Description |
+|--------|-------------|
+| Extraction Model Provider | Different provider for extraction |
+| Extraction Model | Different model for extraction |
+| Custom Extraction Model | Custom model ID for extraction |
+| Extraction Prompt | Specific prompt for extraction step |
+
+### LLM Parameters
+
+Fine-tune model behavior for both OCR and extraction steps:
+
+| Parameter | Description |
+|-----------|-------------|
+| Temperature | Controls randomness (0.0-2.0) |
+| Top P | Nucleus sampling threshold |
+| Frequency Penalty | Reduce repetition of token sequences |
+| Presence Penalty | Reduce repetition of topics |
+| Max Tokens | Maximum tokens in response |
+
+## Output Structure
+
+The node outputs a single item with aggregated results:
+
+\`\`\`json
+{
+  "processedFiles": 1,
+  "filenames": "document.pdf",
+  "filetypes": "pdf",
+  "markdown": "### Attachment Start: document.pdf...",
+  "totalCompletionTime": 5000,
+  "totalInputTokens": 1500,
+  "totalOutputTokens": 800,
+  "totalPagesProcessed": 3,
+  "aggregatedExtracted": [{ "invoiceNumber": "INV-001" }],
+  "aggregatedSummaries": "...",
+  "processingIssues": []
+}
+\`\`\`
+
+### Page-by-Page Mode
+
+When \`Extract Page-by-Page\` is enabled, \`aggregatedExtracted\` contains an array of per-page extraction objects instead of per-file.
+
+## Development
+
+### Prerequisites
+
+- **Node.js** >= 18.10
+- **pnpm** >= 9.1
+
+### Setup
+
+\`\`\`bash
+# Clone the repository
+git clone https://github.com/rwb-truelime/n8n-nodes-truelime-doc.git
+cd n8n-nodes-truelime-doc
+
+# Install dependencies
+pnpm install
+\`\`\`
+
+### Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| \`pnpm dev\` | Start n8n with node loaded and hot reload |
+| \`pnpm build\` | Compile TypeScript and build icons |
+| \`pnpm build:watch\` | Build in watch mode |
+| \`pnpm lint\` | Check code for errors |
+| \`pnpm lintfix\` | Auto-fix linting issues |
+| \`pnpm format\` | Format code with Prettier |
+
+### Local Development
+
+\`\`\`bash
+# Start n8n with your node loaded
+pnpm dev
+
+# Open http://localhost:5678 in your browser
+\`\`\`
+
+### Versioning
+
+This project follows n8n's hybrid versioning model:
+
+- **Light versioning**: Minor updates within a major version use version arrays (e.g., \`version: [1.21, 1.22, 1.23]\`)
+- **Full versioning**: Breaking changes create new major implementations with \`VersionedNodeType\`
+
+## Project Structure
+
+\`\`\`
+├── credentials/
+│   └── LimescapeDocsApi.credentials.ts   # Provider credentials schema
+├── nodes/
+│   └── LimescapeDocs/
+│       ├── LimescapeDocs.node.ts         # Versioned entry node
+│       ├── LimescapeDocs.node.json       # Node metadata
+│       └── v1/
+│           └── LimescapeDocsV1.node.ts   # V1 implementation
+├── icons/                                 # Node icons
+├── package.json
+└── tsconfig.json
+\`\`\`
 
 ## Resources
 
-- **[n8n Node Documentation](https://docs.n8n.io/integrations/creating-nodes/)** - Complete guide to building nodes
-- **[n8n Community Forum](https://community.n8n.io/)** - Get help and share your nodes
-- **[@n8n/node-cli Documentation](https://www.npmjs.com/package/@n8n/node-cli)** - CLI tool reference
-- **[n8n Creator Portal](https://creators.n8n.io/nodes)** - Submit your node for verification
-- **[Submit Community Nodes Guide](https://docs.n8n.io/integrations/creating-nodes/deploy/submit-community-nodes/)** - Verification requirements and process
-
-## Contributing
-
-Have suggestions for improving this starter? [Open an issue](https://github.com/n8n-io/n8n-nodes-starter/issues) or submit a pull request!
+- **[Limescape AI](https://limescape.ai)** - Official website
+- **[n8n Node Documentation](https://docs.n8n.io/integrations/creating-nodes/)** - Building n8n nodes
+- **[n8n Community Forum](https://community.n8n.io/)** - Get help and share
 
 ## License
 
-[MIT](https://github.com/n8n-io/n8n-nodes-starter/blob/master/LICENSE.md)
+[MIT](LICENSE.md)
