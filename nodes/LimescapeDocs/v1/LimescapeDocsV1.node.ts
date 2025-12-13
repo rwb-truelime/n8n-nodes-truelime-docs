@@ -255,6 +255,7 @@ const buildLimescapeArgsForItem = (input: BuildArgsInput): LimescapeDocsArgs => 
     if (po.directImageExtraction !== undefined) args.directImageExtraction = po.directImageExtraction as boolean;
     if (po.enableHybridExtraction !== undefined) args.enableHybridExtraction = po.enableHybridExtraction as boolean;
     if (po.extractOnly !== undefined) args.extractOnly = po.extractOnly as boolean;
+    if (po.extractPageByPage !== undefined) args.extractPageByPage = po.extractPageByPage as boolean;
     if (po.imageDensity !== undefined) args.imageDensity = Number(po.imageDensity);
     if (po.imageHeight !== undefined) args.imageHeight = Number(po.imageHeight);
     if (po.imageFormat) args.imageFormat = po.imageFormat as 'png' | 'jpeg';
@@ -502,6 +503,14 @@ const versionDescription: INodeTypeDescription = {
                 { displayName: 'Direct Image Extraction', name: 'directImageExtraction', type: 'boolean', default: false, description: 'Whether to extract directly from images without full OCR (if applicable)', hint: 'Attempt extraction from images without OCR (faster but less accurate). Default: false.' },
                 { displayName: 'Enable Hybrid Extraction', name: 'enableHybridExtraction', type: 'boolean', default: false, description: 'Whether to use hybrid OCR/extraction methods (if applicable)', hint: 'Use combined OCR/extraction techniques if supported. Default: false.' },
                 { displayName: 'Extract Only', name: 'extractOnly', type: 'boolean', default: false, description: 'Whether to perform only extraction based on schema/prompt, assuming OCR is done or not needed', hint: 'Skip OCR and only perform extraction (useful if text is already available). Default: false.' },
+                {
+                    displayName: 'Extract Page-by-Page',
+                    name: 'extractPageByPage',
+                    type: 'boolean',
+                    default: false,
+                    description: 'Whether to process each document page as a separate LLM extraction call. Prevents hallucination on large documents.',
+                    hint: 'When enabled, aggregatedExtracted contains an array of per-page extraction objects instead of per-file. Results stored in pages[].extracted. Default: false.',
+                },
                 {
                     displayName: 'Extract Per Page Keys',
                     name: 'extractPerPage',
@@ -888,7 +897,20 @@ export class LimescapeDocsV1 implements INodeType {
                     aggregatedResults.inputTokens += (result.inputTokens as number | undefined) || 0;
                     aggregatedResults.outputTokens += (result.outputTokens as number | undefined) || 0;
                     aggregatedResults.pagesProcessed += Array.isArray(result.pages) ? result.pages.length : 0;
-                    if (result.extracted) aggregatedResults.extractedData.push(result.extracted);
+
+                    // Handle extraction results based on extractPageByPage mode
+                    if (limescapeArgs.extractPageByPage && Array.isArray(result.pages)) {
+                        // Per-page extraction: push each page's extracted data
+                        for (const page of result.pages) {
+                            if (page.extracted) {
+                                aggregatedResults.extractedData.push(page.extracted);
+                            }
+                        }
+                    } else if (result.extracted) {
+                        // Standard extraction: push the full document extraction
+                        aggregatedResults.extractedData.push(result.extracted);
+                    }
+
                     if (result.summary) {
                         aggregatedResults.summaries.push(typeof result.summary === 'string' ? result.summary : JSON.stringify(result.summary));
                     }
