@@ -270,13 +270,9 @@ const buildLimescapeArgsForItem = (input: BuildArgsInput): LimescapeDocsArgs => 
         args.pagesToConvertAsImages = pagesToConvert;
     }
 
-    const extractPerPageStr = po.extractPerPage as string | undefined;
-    if (extractPerPageStr) {
-        const pages = extractPerPageStr
-            .split(',')
-            .map((p) => p.trim())
-            .filter((p) => p.length > 0);
-        if (pages.length > 0) args.extractPerPage = pages;
+    const extractPerPage = (po.extractPerPage as string[] | undefined)?.filter((k) => k.length > 0);
+    if (extractPerPage && extractPerPage.length > 0) {
+        args.extractPerPage = extractPerPage;
     }
 
     // Extraction options
@@ -323,7 +319,7 @@ const versionDescription: INodeTypeDescription = {
     name: 'limescapeDocs',
     icon: 'file:limescape-logo-square.svg',
     group: ['transform'],
-    version: [1, 1.21, 1.22],
+    version: [1, 1.21, 1.22, 1.23],
     subtitle: '={{$parameter["operation"]}}',
     description: 'OCR & Document Extraction using AI models via Limescape Docs',
     defaults: {
@@ -506,7 +502,18 @@ const versionDescription: INodeTypeDescription = {
                 { displayName: 'Direct Image Extraction', name: 'directImageExtraction', type: 'boolean', default: false, description: 'Whether to extract directly from images without full OCR (if applicable)', hint: 'Attempt extraction from images without OCR (faster but less accurate). Default: false.' },
                 { displayName: 'Enable Hybrid Extraction', name: 'enableHybridExtraction', type: 'boolean', default: false, description: 'Whether to use hybrid OCR/extraction methods (if applicable)', hint: 'Use combined OCR/extraction techniques if supported. Default: false.' },
                 { displayName: 'Extract Only', name: 'extractOnly', type: 'boolean', default: false, description: 'Whether to perform only extraction based on schema/prompt, assuming OCR is done or not needed', hint: 'Skip OCR and only perform extraction (useful if text is already available). Default: false.' },
-                { displayName: 'Extract Per Page', name: 'extractPerPage', type: 'string', default: '', description: 'Comma-separated page numbers/ranges for targeted extraction', hint: 'Specify pages/ranges (e.g., 1,3-5) for extraction. Default: empty (all pages).' },
+                {
+                    displayName: 'Extract Per Page Keys',
+                    name: 'extractPerPage',
+                    type: 'multiOptions',
+                    default: [],
+                    description: 'Choose from the list, or specify IDs using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
+                    hint: 'Select schema property keys to extract per page. Only top-level keys supported. Nested properties are extracted as complete units.',
+                    typeOptions: {
+                        loadOptionsMethod: 'getSchemaPropertyKeys',
+                        loadOptionsDependsOn: ['schema'],
+                    },
+                },
                 { displayName: 'Image Density (DPI)', name: 'imageDensity', type: 'number', default: 150, description: 'Target DPI for image conversion during OCR', typeOptions: { minValue: 70 }, hint: 'Resolution for image conversion during OCR. Min: 70. Default: 150.' },
                 { displayName: 'Image Format', name: 'imageFormat', type: 'options', options: [ { name: 'PNG', value: 'png' }, { name: 'JPEG', value: 'jpeg' } ], default: 'png', description: 'Image format used for intermediate images during OCR', hint: 'Choose PNG or JPEG for intermediate image conversion. Default: PNG.' },
                 { displayName: 'Image Height (Pixels)', name: 'imageHeight', type: 'number', default: 3072, description: 'Target height for image resizing (preserves aspect ratio)', hint: 'Resize images to this height before processing. Default: 3072.' },
@@ -600,6 +607,47 @@ export class LimescapeDocsV1 implements INodeType {
 
     methods = {
         loadOptions: {
+            async getSchemaPropertyKeys(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+                const schemaRaw = this.getCurrentNodeParameter('schema') as string | undefined;
+
+                if (!schemaRaw || typeof schemaRaw !== 'string') {
+                    return [];
+                }
+
+                const trimmed = schemaRaw.trim();
+                if (trimmed === '' || trimmed === '{}') {
+                    return [];
+                }
+
+                try {
+                    const schema = JSON.parse(trimmed);
+                    if (!schema || typeof schema !== 'object' || !schema.properties) {
+                        return [];
+                    }
+
+                    const properties = schema.properties as Record<string, { type?: string; description?: string }>;
+                    const keys = Object.keys(properties);
+
+                    if (keys.length === 0) {
+                        return [];
+                    }
+
+                    return keys.map((key) => {
+                        const prop = properties[key];
+                        const typeStr = prop?.type || 'unknown';
+                        const desc = prop?.description ? ` - ${prop.description.slice(0, 50)}${prop.description.length > 50 ? '...' : ''}` : '';
+                        return {
+                            name: `${key} (${typeStr})`,
+                            value: key,
+                            description: `Type: ${typeStr}${desc}`,
+                        };
+                    });
+                } catch {
+                    // Invalid JSON - return empty array, n8n will show "No options available"
+                    return [];
+                }
+            },
+
             async getModelsForProvider(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
                 const provider = this.getCurrentNodeParameter('modelProvider') as string;
                 const by = (entries: Array<INodePropertyOptions>) => entries;
