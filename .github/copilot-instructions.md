@@ -41,7 +41,8 @@ Purpose: Help AI coding agents work productively in this repository by documenti
   - Vertex → `serviceAccount` (JSON string), `location`.
   - Bedrock → `region`, optional `accessKeyId`, `secretAccessKey`, `sessionToken`.
 - Schema input: Accepts stringified JSON. Empty (`""` or `{}`) treated as undefined. Parsing failure throws `NodeOperationError`.
-- Pages input: Use `"1,3-5"` style for `pagesToConvertAsImages` and `extractPerPage` (the latter stays as string tokens, not numbers).
+- Pages input: Use `"1,3-5"` style for `pagesToConvertAsImages` (converts to `number[]`).
+- Extract Per Page Keys: `multiOptions` field populated dynamically from schema properties via `loadOptionsMethod: 'getSchemaPropertyKeys'`. Accepts top-level schema keys (e.g., `["lineItems", "transactions"]`) to extract per page. The library splits schema into per-page and full-document portions.
 - Icons: Use `file:limescape-logo-square.svg` and keep icon build via gulp consistent.
 - Outputs: One `main` output only; inputs configured explicitly as `main`.
 
