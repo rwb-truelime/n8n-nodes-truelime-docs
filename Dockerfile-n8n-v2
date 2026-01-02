@@ -1,0 +1,62 @@
+# ==============================================================================
+# n8n v2 Custom Build with System Dependencies
+# Strategy: Multi-stage build using n8nio/base (which has apk) to install
+# system packages, then copy them into the final runtime image.
+# ==============================================================================
+
+ARG NODE_VERSION=22
+ARG N8N_VERSION=2.1.5
+ARG LIMESCAPE_DOCS_VERSION=1.23.0
+
+# ==============================================================================
+# STAGE 1: Install System Dependencies (n8nio/base still has apk available)
+# ==============================================================================
+FROM n8nio/base:${NODE_VERSION} AS system-deps
+
+# Install system dependencies while apk is still available
+RUN apk add --no-cache \
+    ghostscript \
+    libreoffice \
+    ffmpeg \
+    poppler-utils
+
+# ==============================================================================
+# STAGE 2: Final Runtime Image
+# ==============================================================================
+FROM docker.n8n.io/n8nio/n8n:${N8N_VERSION} AS runtime
+
+ARG LIMESCAPE_DOCS_VERSION
+
+USER root
+
+# Copy system packages from the builder stage (broad copy for reliability)
+# This ensures all binaries, libraries, and their transitive dependencies are included
+# Trade-off: larger image size but guaranteed to work without missing library errors
+COPY --from=system-deps /usr/bin /usr/bin
+COPY --from=system-deps /usr/lib /usr/lib
+COPY --from=system-deps /usr/share /usr/share
+
+# Install the desired npm module(s)
+RUN npm i -g langfuse-langchain --loglevel verbose
+
+# Install the custom nodes
+WORKDIR /home/node/.n8n
+RUN mkdir -p nodes
+
+COPY n8n-nodes-limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz /home/node/.n8n/nodes/
+COPY limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz /home/node/.n8n/nodes/
+
+RUN cd /home/node/.n8n/nodes/ && \
+    npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz --loglevel verbose && \
+    npm install ./limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz --loglevel verbose && \
+    npm install ./n8n-nodes-limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz --loglevel verbose && \
+    npm install @langfuse/n8n-nodes-langfuse --loglevel verbose && \
+    npm install n8n-nodes-eml --loglevel verbose && \
+    npm install n8n-nodes-run-node-with-credentials-x --loglevel verbose && \
+    chown -R node:node /home/node/.n8n/nodes && \
+    rm -rf /home/node/.n8n/nodes/*.tgz
+
+# Switch back to the node homedir and user
+WORKDIR /home/node
+USER node
+COPY ai-ktl.jpg .
