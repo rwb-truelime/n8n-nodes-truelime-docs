@@ -60,14 +60,37 @@ function get_latest_v1_version
         return 0
     end
 
-    # Try pnpm view (since this is a Node project)
+    # Primary: Query npm for the 'latest' dist-tag (stable version)
     if type -q pnpm
-        set -l ver_json (pnpm view n8n versions --json 2>/dev/null)
+        set -l ver (pnpm view n8n dist-tags.latest 2>/dev/null)
+        if test $status -eq 0; and test -n "$ver"
+            # Verify it's a v1 version
+            if string match -qr '^1\.' $ver
+                echo $ver
+                return 0
+            else
+                begin
+                    set_color yellow
+                    echo "Note: npm 'latest' tag is $ver (not v1). Falling back to GitHub API..."
+                    set_color normal
+                end 1>&2
+            end
+        end
+    end
+
+    # First fallback: GitHub Releases API (reliable prerelease detection)
+    # The prerelease boolean field is authoritative - n8n uses clean semver
+    # for pre-releases (e.g., 1.123.16 can be marked prerelease without suffix)
+    if type -q curl
+        set -l releases_json (curl -fsSL https://api.github.com/repos/n8n-io/n8n/releases 2>/dev/null)
         if test $status -eq 0
-            set -l ver (echo $ver_json | node -e '
+            set -l ver (echo $releases_json | node -e '
                 try {
-                    const versions = JSON.parse(require("fs").readFileSync(0, "utf-8"));
-                    const v1 = versions
+                    const releases = JSON.parse(require("fs").readFileSync(0, "utf-8"));
+                    // Filter: only stable releases (prerelease=false, draft=false) and v1 versions
+                    const v1 = releases
+                        .filter(r => !r.prerelease && !r.draft)
+                        .map(r => r.tag_name.replace(/^n8n@/, ""))
                         .filter(v => /^1\.\d+\.\d+$/.test(v))
                         .sort((a, b) => {
                             const pa = a.split(".").map(Number);
@@ -89,15 +112,23 @@ function get_latest_v1_version
         end
     end
 
-    # Fallback: GitHub Releases API
-    if type -q curl
-        set -l releases_json (curl -fsSL https://api.github.com/repos/n8n-io/n8n/releases 2>/dev/null)
+    # Last resort: npm versions list
+    # WARNING: This method CANNOT reliably detect pre-releases because n8n uses
+    # clean semver (e.g., 1.123.16) for pre-releases without suffixes like -beta.
+    # The regex filter only excludes versions with suffixes, not GitHub-marked pre-releases.
+    if type -q pnpm
+        begin
+            set_color yellow
+            echo "Warning: Using npm versions list (may include pre-releases)"
+            set_color normal
+        end 1>&2
+        set -l ver_json (pnpm view n8n versions --json 2>/dev/null)
         if test $status -eq 0
-            set -l ver (echo $releases_json | node -e '
+            set -l ver (echo $ver_json | node -e '
                 try {
-                    const releases = JSON.parse(require("fs").readFileSync(0, "utf-8"));
-                    const v1 = releases
-                        .map(r => r.tag_name.replace(/^n8n@/, ""))
+                    const versions = JSON.parse(require("fs").readFileSync(0, "utf-8"));
+                    // Only filters suffixed versions - cannot detect GitHub-marked pre-releases
+                    const v1 = versions
                         .filter(v => /^1\.\d+\.\d+$/.test(v))
                         .sort((a, b) => {
                             const pa = a.split(".").map(Number);
