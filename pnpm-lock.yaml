@@ -2566,7 +2566,7 @@ packages:
     engines: {node: '>=14'}
 
   limescape-docs@file:../limescape-ai-limescape-docs/limescape-docs-1.23.0.tgz:
-    resolution: {integrity: sha512-Hw8IrlC4p/Y6KmAMivhjbm7axz6IrcB419ldGjsol7wJ8WIhzCzA7QoZJV5mTlSvWTYgHTEX6Ft2M0jjDXBsHg==, tarball: file:../limescape-ai-limescape-docs/limescape-docs-1.23.0.tgz}
+    resolution: {integrity: sha512-CBviatk2JVYlXX69mWvLG2YWmsqihqT6FOKughdMJInhW0Z/LKwso96fm3IM3CH0Azh/3C6cgglI79J/EaY00A==, tarball: file:../limescape-ai-limescape-docs/limescape-docs-1.23.0.tgz}
     version: 1.23.0
 
   locate-path@6.0.0:
@@ -3567,14 +3567,14 @@ snapshots:
   '@aws-crypto/crc32c@5.2.0':
     dependencies:
       '@aws-crypto/util': 5.2.0
-      '@aws-sdk/types': 3.972.0
+      '@aws-sdk/types': 3.804.0
       tslib: 2.8.1
 
   '@aws-crypto/sha1-browser@5.2.0':
     dependencies:
       '@aws-crypto/supports-web-crypto': 5.2.0
       '@aws-crypto/util': 5.2.0
-      '@aws-sdk/types': 3.972.0
+      '@aws-sdk/types': 3.804.0
       '@aws-sdk/util-locate-window': 3.965.3
       '@smithy/util-utf8': 2.3.0
       tslib: 2.8.1

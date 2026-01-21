@@ -6,8 +6,24 @@ ARG LIMESCAPE_DOCS_VERSION=1.23.0
 USER root
 WORKDIR /usr/local/lib/node_modules/n8n
 
+# Needed to fix 'Fontconfig warning: ignoring C.UTF-8: not a valid language tag'
+ENV LANG=en_US.UTF-8
+ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk
+ENV PATH="$JAVA_HOME/bin:$PATH"
+
 # Install system dependencies
-RUN apk update && apk add --no-cache ghostscript libreoffice ffmpeg poppler-utils
+# - libreoffice: for .docx → PDF conversion
+# - openjdk21-jre-headless: Java runtime required by LibreOffice
+# - fontconfig + fonts: required for font rendering
+RUN apk update && apk add --no-cache \
+    ghostscript \
+    libreoffice \
+    openjdk21-jre-headless \
+    fontconfig \
+    ttf-dejavu \
+    ttf-liberation \
+    ffmpeg \
+    poppler-utils
 
 # Install the desired npm module(s)
 RUN npm i -g langfuse-langchain --loglevel verbose
