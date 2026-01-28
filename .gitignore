@@ -8,3 +8,4 @@ node_modules
 *.gz
 *.rar
 *.7z
+*.log
