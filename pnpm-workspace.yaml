@@ -1,4 +1,5 @@
 onlyBuiltDependencies:
+  - '@sentry-internal/node-cpu-profiler'
   - '@sentry-internal/node-native-stacktrace'
   - cpu-features
   - eslint-plugin-n8n-nodes-base

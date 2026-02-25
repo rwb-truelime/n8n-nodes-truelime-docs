@@ -5,13 +5,15 @@
 # ==============================================================================
 
 ARG NODE_VERSION=22
-ARG N8N_VERSION=2.1.5
+ARG N8N_VERSION=2.9.2
 ARG LIMESCAPE_DOCS_VERSION=1.23.0
 
 # ==============================================================================
-# STAGE 1: Install System Dependencies (n8nio/base still has apk available)
+# STAGE 1: Install System Dependencies
+# n8nio/base no longer ships apk (stripped since n8n ≥ 2.1.0), so we use a
+# plain Alpine image that matches the runtime's Alpine version instead.
 # ==============================================================================
-FROM n8nio/base:${NODE_VERSION} AS system-deps
+FROM alpine:3.21 AS system-deps
 
 # Needed to fix 'Fontconfig warning: ignoring C.UTF-8: not a valid language tag'
 ENV LANG=en_US.UTF-8

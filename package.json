@@ -57,16 +57,16 @@
     "n8n-workflow": ">=1.50.0 || >=2.0.0"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.3",
-    "@eslint/js": "^9.39.2",
-    "@typescript-eslint/parser": "^8.54.0",
-    "eslint": "^9.39.2",
-    "eslint-plugin-n8n-nodes-base": "^1.16.5",
+    "@eslint/eslintrc": "^3.3.4",
+    "@eslint/js": "^9.39.3",
+    "@typescript-eslint/parser": "^8.56.1",
+    "eslint": "^9.39.3",
+    "eslint-plugin-n8n-nodes-base": "^1.16.6",
     "globals": "^16.5.0",
     "gulp": "^5.0.1",
     "limescape-docs": "file:/home/rodger/truelime-git-projects/limescape-ai-limescape-docs/limescape-docs-1.23.0.tgz",
-    "n8n-core": "^2.6.0",
-    "n8n-workflow": "^2.6.0",
+    "n8n-core": "^2.10.1",
+    "n8n-workflow": "^2.10.1",
     "prettier": "^3.8.1",
     "typescript": "^5.9.3"
   },
