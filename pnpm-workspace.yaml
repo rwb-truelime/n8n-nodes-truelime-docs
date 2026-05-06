@@ -1,4 +1,5 @@
 onlyBuiltDependencies:
+  - '@google/genai'
   - '@sentry-internal/node-cpu-profiler'
   - '@sentry-internal/node-native-stacktrace'
   - cpu-features
