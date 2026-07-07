@@ -556,8 +556,12 @@ const versionDescription: INodeTypeDescription = {
                 ], default: '', description: 'Override provider for extraction step', hint: 'Optional: Select a different AI provider just for extraction. Default: empty (use main provider).' },
                 { displayName: 'Extraction Model', name: 'extractionModel', type: 'options', options: [
                     { name: 'Claude 4.5 Sonnet (Bedrock)', value: 'anthropic.claude-4.5-sonnet-20250929-v1:0' },
+                    { name: 'Gemini 2.5 Flash (Google)', value: 'gemini-2.5-flash' },
+                    { name: 'Gemini 2.5 Flash-Lite (Google)', value: 'gemini-2.5-flash-lite' },
                     { name: 'Gemini 2.5 Pro (Google)', value: 'gemini-2.5-pro' },
-                    { name: 'Gemini 3 Pro Preview (Google)', value: 'gemini-3-pro-preview' },
+                    { name: 'Gemini 3.1 Flash-Lite (Google)', value: 'gemini-3.1-flash-lite' },
+                    { name: 'Gemini 3.1 Pro Preview (Google)', value: 'gemini-3.1-pro-preview' },
+                    { name: 'Gemini 3.5 Flash (Google)', value: 'gemini-3.5-flash' },
                     { name: 'GPT-4o (OpenAI/Azure)', value: 'gpt-4o' },
                     { name: 'GPT-5.1 (OpenAI/Azure)', value: 'gpt-5.1' },
                 ], default: 'gpt-5.1', description: 'Override model for extraction step', hint: 'Optional: Select a different AI model just for extraction. Default: gpt-5.1.' },
@@ -673,9 +677,12 @@ export class LimescapeDocsV1 implements INodeType {
                 }
                 if (provider === LimescapeModelProvider.GOOGLE) {
                     return by([
+                        { name: 'Gemini 3.5 Flash', value: 'gemini-3.5-flash' },
+                        { name: 'Gemini 3.1 Pro Preview', value: 'gemini-3.1-pro-preview' },
+                        { name: 'Gemini 3.1 Flash-Lite', value: 'gemini-3.1-flash-lite' },
                         { name: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
                         { name: 'Gemini 2.5 Flash', value: 'gemini-2.5-flash' },
-                        { name: 'Gemini 3 Pro Preview', value: 'gemini-3-pro-preview' },
+                        { name: 'Gemini 2.5 Flash-Lite', value: 'gemini-2.5-flash-lite' },
                     ]);
                 }
                 if (provider === LimescapeModelProvider.AZURE_AIF) {
@@ -695,9 +702,12 @@ export class LimescapeDocsV1 implements INodeType {
                 }
                 if (provider === LimescapeModelProvider.VERTEX) {
                     return by([
+                        { name: 'Gemini 3.5 Flash', value: 'gemini-3.5-flash' },
+                        { name: 'Gemini 3.1 Pro Preview', value: 'gemini-3.1-pro-preview' },
+                        { name: 'Gemini 3.1 Flash-Lite', value: 'gemini-3.1-flash-lite' },
                         { name: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
                         { name: 'Gemini 2.5 Flash', value: 'gemini-2.5-flash' },
-                        { name: 'Gemini 3 Pro Preview', value: 'gemini-3-pro-preview' },
+                        { name: 'Gemini 2.5 Flash-Lite', value: 'gemini-2.5-flash-lite' },
                         { name: 'Claude 4.5 Sonnet (Bedrock)', value: 'anthropic.claude-4.5-sonnet-20250929-v1:0' },
                         { name: 'Claude 4.1 Sonnet (Bedrock)', value: 'anthropic.claude-4.1-sonnet-20250810-v1:0' },
                     ]);

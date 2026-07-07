@@ -1,10 +1,21 @@
 name: CI
 
+# CI is currently DISABLED (manual trigger only).
+#
+# Why: the `limescape-docs` dependency resolves to a local `file:` tarball from a
+# private sibling repo (see package.json / CLAUDE.md). That tarball is gitignored and
+# not available on GitHub-hosted runners, so `pnpm install` fails — and both lint and
+# build need its types. Until limescape-docs is published to a reachable registry (or
+# this runs on a self-hosted runner that has the tarball), CI cannot pass.
+#
+# To re-enable automatic CI once that is solved, replace the `on:` block below with:
+#   on:
+#     pull_request:
+#     push:
+#       branches:
+#         - master
 on:
-  pull_request:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   build:
@@ -13,16 +24,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Use Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: 'npm ci'
+        run: pnpm install --frozen-lockfile
 
       - name: Run lint
-        run: 'npm run lint'
+        run: pnpm lint
 
       - name: Run build
-        run: 'npm run build'
+        run: pnpm build
