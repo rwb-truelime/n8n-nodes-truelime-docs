@@ -2950,7 +2950,7 @@ packages:
     engines: {node: '>=14'}
 
   limescape-docs@file:../limescape-ai-limescape-docs/limescape-docs-1.23.0.tgz:
-    resolution: {integrity: sha512-CilUR3t59HhFHQ8G7zEHh7FtNnXl53p6rSZ/SzXHfEbORYmD51UFy3uHFcZ0iLJ9KOwj50CwdFVZmDL6uz+RkQ==, tarball: file:../limescape-ai-limescape-docs/limescape-docs-1.23.0.tgz}
+    resolution: {integrity: sha512-592COf5N3LA/0hMoucKrNwFEI+D+624p9TVxTqmx2iGXQeZp0V7bO6ESECAuc+51/A6Gf4Rekdp0SnKyQz6RPA==, tarball: file:../limescape-ai-limescape-docs/limescape-docs-1.23.0.tgz}
     version: 1.23.0
 
   load-esm@1.0.3:
@@ -6189,7 +6189,7 @@ snapshots:
 
   '@types/node-fetch@2.6.13':
     dependencies:
-      '@types/node': 18.19.130
+      '@types/node': 26.1.0
       form-data: 4.0.6
 
   '@types/node@18.19.130':
@@ -7434,7 +7434,7 @@ snapshots:
       jsonwebtoken: 9.0.3
       load-esm: 1.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.14.0(debug@4.4.3))
+      retry-axios: 2.6.0(axios@1.14.0)
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -8283,7 +8283,7 @@ snapshots:
       path-parse: 1.0.7
       supports-preserve-symlinks-flag: 1.0.0
 
-  retry-axios@2.6.0(axios@1.14.0(debug@4.4.3)):
+  retry-axios@2.6.0(axios@1.14.0):
     dependencies:
       axios: 1.14.0(debug@4.4.3)
 

@@ -20,6 +20,8 @@ import {
     LLMParams,
     ModelProvider as LimescapeModelProvider,
     ErrorMode as LimescapeErrorMode,
+    Gemini3ThinkingLevel,
+    Gemini3MediaResolution,
 } from 'limescape-docs';
 
 // Helper function to safely create a temporary directory if needed
@@ -369,6 +371,12 @@ const versionDescription: INodeTypeDescription = {
             default: '={{ ($parameter["customModel"] || $parameter["model"] || "").toLowerCase().startsWith("gemini-3") }}',
         },
         {
+            displayName: 'Is Extraction Gemini 3',
+            name: 'isExtractionGemini3',
+            type: 'hidden',
+            default: '={{ (($parameter["extractionOptions"] && ($parameter["extractionOptions"].customExtractionModel || $parameter["extractionOptions"].extractionModel)) || $parameter["customModel"] || $parameter["model"] || "").toLowerCase().startsWith("gemini-3") }}',
+        },
+        {
             displayName: 'Model Name or ID',
             name: 'model',
             type: 'options',
@@ -397,7 +405,7 @@ const versionDescription: INodeTypeDescription = {
             placeholder: 'Add Gemini 3 Option',
             default: {},
             description: 'Options specific to Google/Vertex Gemini 3 models',
-            hint: 'Available only for Gemini 3 Pro Preview models.',
+            hint: 'Available only for Gemini 3 models (e.g. 3.5 Flash, 3.1 Pro Preview).',
             displayOptions: {
                 show: {
                     isGemini3: [true],
@@ -409,12 +417,14 @@ const versionDescription: INodeTypeDescription = {
                     name: 'thinkingLevel',
                     type: 'options',
                     options: [
+                        { name: 'Minimal', value: 'minimal' },
                         { name: 'Low', value: 'low' },
+                        { name: 'Medium', value: 'medium' },
                         { name: 'High', value: 'high' },
                     ],
-                    default: 'low',
+                    default: 'medium',
                     description: 'Controls depth of reasoning for Gemini 3 models',
-                    hint: 'Applied only for Gemini 3 models; availability may vary by region/project.',
+                    hint: 'Applied only for Gemini 3 models. Minimal/Medium were added in Gemini 3.5; default matches the model default. Availability may vary by region/project.',
                 },
                 {
                     displayName: 'Media Resolution',
@@ -583,8 +593,8 @@ const versionDescription: INodeTypeDescription = {
                 { displayName: 'Max Output Tokens', name: 'maxOutputTokens', type: 'number', default: 0, description: 'Max tokens for the generated output (e.g. Gemini)', hint: 'Primarily used by Google/Vertex Gemini models. 0 = library default.' },
                 { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 8192, description: 'Max tokens for the LLM response', typeOptions: { minValue: 1 }, hint: 'Maximum length of the AI response. Default: 8192.' },
                 { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes new tokens', hint: 'Discourage introducing new topics. Default: 0.' },
-                { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, description: 'Controls randomness (0=deterministic)', hint: 'Higher values mean more creativity, lower means more focused. Default: 0.2.' },
-                { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, description: 'Nucleus sampling parameter', hint: 'Alternative to temperature for controlling randomness. Default: 1.' },
+                { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, description: 'Controls randomness (0=deterministic)', hint: 'Higher values mean more creativity, lower means more focused. Default: 0.2.', displayOptions: { hide: { '/isGemini3': [true] } } },
+                { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, description: 'Nucleus sampling parameter', hint: 'Alternative to temperature for controlling randomness. Default: 1.', displayOptions: { hide: { '/isGemini3': [true] } } },
             ],
         },
         {
@@ -601,8 +611,8 @@ const versionDescription: INodeTypeDescription = {
                 { displayName: 'Max Output Tokens', name: 'maxOutputTokens', type: 'number', default: 0, hint: 'Extraction specific: Max generated tokens (e.g. Gemini). 0 = library default.' },
                 { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 8192, typeOptions: { minValue: 1 }, hint: 'Extraction specific: Max response length. Default: 8192.' },
                 { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, hint: 'Extraction specific: Discourage new topics. Default: 0.' },
-                { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, hint: 'Extraction specific: Controls randomness. Default: 0.1.' },
-                { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, hint: 'Extraction specific: Nucleus sampling. Default: 1.' },
+                { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, hint: 'Extraction specific: Controls randomness. Default: 0.1.', displayOptions: { hide: { '/isExtractionGemini3': [true] } } },
+                { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, hint: 'Extraction specific: Nucleus sampling. Default: 1.', displayOptions: { hide: { '/isExtractionGemini3': [true] } } },
             ],
         },
     ],
@@ -879,11 +889,11 @@ export class LimescapeDocsV1 implements INodeType {
                         limescapeArgs.googleOptions.gemini3 = {};
 
                         if (typeof globalGemini3Options.thinkingLevel === 'string' && globalGemini3Options.thinkingLevel) {
-                            limescapeArgs.googleOptions.gemini3.thinkingLevel = globalGemini3Options.thinkingLevel as 'low' | 'high';
+                            limescapeArgs.googleOptions.gemini3.thinkingLevel = globalGemini3Options.thinkingLevel as Gemini3ThinkingLevel;
                         }
 
                         if (typeof globalGemini3Options.mediaResolution === 'string' && globalGemini3Options.mediaResolution) {
-                            limescapeArgs.googleOptions.gemini3.mediaResolution = globalGemini3Options.mediaResolution as 'low' | 'medium' | 'high';
+                            limescapeArgs.googleOptions.gemini3.mediaResolution = globalGemini3Options.mediaResolution as Gemini3MediaResolution;
                         }
                     }
 
