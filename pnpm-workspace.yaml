@@ -2,6 +2,8 @@ onlyBuiltDependencies:
   - '@google/genai'
   - '@sentry-internal/node-cpu-profiler'
   - '@sentry-internal/node-native-stacktrace'
+  - '@sentry/node-cpu-profiler'
+  - '@sentry/node-native-stacktrace'
   - cpu-features
   - eslint-plugin-n8n-nodes-base
   - isolated-vm
