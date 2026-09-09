@@ -31,7 +31,6 @@
   "packageManager": "pnpm@10.23.0+sha512.21c4e5698002ade97e4efe8b8b4a89a8de3c85a37919f957e7a0f30f38fbc5bbdd05980ffe29179b2fb6e6e691242e098d945d1601772cad0fef5fb6411e2a4b",
   "main": "index.js",
   "scripts": {
-    "preinstall": "npx only-allow pnpm",
     "build": "tsc && gulp build:icons",
     "build:watch": "n8n-node build --watch",
     "dev": "n8n-node dev",
@@ -57,21 +56,21 @@
     "n8n-workflow": "^2.15.0"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3.3.5",
+    "@n8n/node-cli": "^0.31.1",
+    "@eslint/eslintrc": "^3.3.7",
     "@eslint/js": "9.39.4",
-    "@typescript-eslint/parser": "^8.63.0",
+    "@typescript-eslint/parser": "^8.70.0",
     "eslint": "9.39.4",
     "eslint-plugin-n8n-nodes-base": "^1.16.7",
-    "globals": "^17.7.0",
+    "globals": "^17.12.0",
     "gulp": "^5.0.1",
     "limescape-docs": "file:/home/rodger/truelime-git-projects/limescape-ai-limescape-docs/limescape-docs-1.23.0.tgz",
     "n8n-core": "^2.16.1",
     "n8n-workflow": "^2.16.0",
-    "prettier": "^3.9.4",
+    "prettier": "^3.9.6",
     "typescript": "5.9.3"
   },
   "dependencies": {
-    "@n8n/node-cli": "^0.31.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }
