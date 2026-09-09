@@ -1,29 +1,22 @@
 # ==============================================================================
-# n8n v2 Custom Build with System Dependencies
-# Strategy: Multi-stage build using n8nio/base (which has apk) to install
-# system packages, then copy them into the final runtime image.
+# n8n v2 custom image with Limescape Docs runtime dependencies.
+# The release script resolves N8N_NODE_BUILDER_IMAGE from the matching upstream
+# n8n tag, keeping Node and Alpine ABI-compatible across n8n upgrades.
 # ==============================================================================
 
-ARG NODE_VERSION=22
-ARG N8N_VERSION=2.9.2
+ARG N8N_VERSION=2.38.1
+ARG N8N_NODE_BUILDER_IMAGE=node:26.7.0-alpine3.24
 ARG LIMESCAPE_DOCS_VERSION=1.23.0
 
 # ==============================================================================
-# STAGE 1: Install System Dependencies
-# n8nio/base no longer ships apk (stripped since n8n ≥ 2.1.0), so we use a
-# plain Alpine image that matches the runtime's Alpine version instead.
+# STAGE 1: Document Runtime Dependencies
 # ==============================================================================
-FROM alpine:3.21 AS system-deps
+FROM ${N8N_NODE_BUILDER_IMAGE} AS document-deps
 
-# Needed to fix 'Fontconfig warning: ignoring C.UTF-8: not a valid language tag'
 ENV LANG=en_US.UTF-8
 ENV JAVA_HOME=/usr/lib/jvm/java-21-openjdk
 ENV PATH="$JAVA_HOME/bin:$PATH"
 
-# Install system dependencies while apk is still available
-# - libreoffice: for .docx → PDF conversion
-# - openjdk21-jre-headless: Java runtime required by LibreOffice
-# - fontconfig + fonts: required for font rendering
 RUN apk add --no-cache \
     ghostscript \
     libreoffice \
@@ -35,43 +28,48 @@ RUN apk add --no-cache \
     poppler-utils
 
 # ==============================================================================
-# STAGE 2: Final Runtime Image
+# STAGE 2: Community Node Build
+# Native modules must be built against the exact Node/Alpine combination used
+# by the selected n8n release. The compiler remains out of the final image.
 # ==============================================================================
-FROM docker.n8n.io/n8nio/n8n:${N8N_VERSION} AS runtime
+FROM document-deps AS community-nodes
 
 ARG LIMESCAPE_DOCS_VERSION
 
+RUN apk add --no-cache python3 make g++
+
+WORKDIR /home/node/.n8n/nodes
+
+COPY n8n-nodes-limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz ./
+COPY limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz ./
+
+RUN echo "dangerously-allow-all-scripts=true" > .npmrc && \
+    echo "allow-remote=all" >> .npmrc && \
+    npm install --legacy-peer-deps https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz --loglevel verbose && \
+    npm install --legacy-peer-deps ./limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz --loglevel verbose && \
+    npm install --legacy-peer-deps ./n8n-nodes-limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz --loglevel verbose && \
+    npm install --legacy-peer-deps @langfuse/n8n-nodes-langfuse --loglevel verbose && \
+    npm install --legacy-peer-deps n8n-nodes-eml --loglevel verbose && \
+    npm install --legacy-peer-deps n8n-nodes-run-node-with-credentials-x --loglevel verbose && \
+    rm -rf /root/.npm /home/node/.n8n/nodes/*.tgz .npmrc
+
+# ==============================================================================
+# STAGE 3: Official n8n Runtime
+# ==============================================================================
+FROM docker.n8n.io/n8nio/n8n:${N8N_VERSION} AS runtime
+
 USER root
 
-# Copy system packages from the builder stage (broad copy for reliability)
-# This ensures all binaries, libraries, and their transitive dependencies are included
-# Trade-off: larger image size but guaranteed to work without missing library errors
-COPY --from=system-deps /usr/bin /usr/bin
-COPY --from=system-deps /usr/lib /usr/lib
-COPY --from=system-deps /usr/share /usr/share
-COPY --from=system-deps /etc/fonts /etc/fonts
+COPY --from=document-deps /usr/bin /usr/bin
+COPY --from=document-deps /usr/lib /usr/lib
+COPY --from=document-deps /usr/share /usr/share
+COPY --from=document-deps /etc/fonts /etc/fonts
+COPY --from=community-nodes /home/node/.n8n/nodes /home/node/.n8n/nodes
 
-# Install the desired npm module(s)
-RUN npm i -g langfuse-langchain --loglevel verbose
+RUN npm i -g langfuse-langchain --loglevel verbose && \
+    ln -s /usr/local/lib/node_modules/n8n/node_modules/n8n-workflow /home/node/.n8n/nodes/node_modules/n8n-workflow && \
+    chown -R node:node /home/node/.n8n
 
-# Install the custom nodes
-WORKDIR /home/node/.n8n
-RUN mkdir -p nodes
-
-COPY n8n-nodes-limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz /home/node/.n8n/nodes/
-COPY limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz /home/node/.n8n/nodes/
-
-RUN cd /home/node/.n8n/nodes/ && \
-    npm install https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz --loglevel verbose && \
-    npm install ./limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz --loglevel verbose && \
-    npm install ./n8n-nodes-limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz --loglevel verbose && \
-    npm install @langfuse/n8n-nodes-langfuse --loglevel verbose && \
-    npm install n8n-nodes-eml --loglevel verbose && \
-    npm install n8n-nodes-run-node-with-credentials-x --loglevel verbose && \
-    chown -R node:node /home/node/.n8n/nodes && \
-    rm -rf /home/node/.n8n/nodes/*.tgz
-
-# Switch back to the node homedir and user
 WORKDIR /home/node
 USER node
 COPY ai-ktl.jpg .

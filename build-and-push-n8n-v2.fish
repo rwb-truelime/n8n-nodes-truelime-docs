@@ -157,6 +157,27 @@ function get_latest_v2_version
     exit 1
 end
 
+function get_n8n_node_builder_image
+    set -l n8n_version $argv[1]
+    if not type -q curl
+        set_color red
+        echo "curl is required to resolve the n8n native build image." 1>&2
+        set_color normal
+        return 1
+    end
+
+    set -l dockerfile_url "https://raw.githubusercontent.com/n8n-io/n8n/n8n%40$n8n_version/docker/images/n8n/Dockerfile"
+    set -l builder_image (curl -fsSL --retry 3 "$dockerfile_url" | string match -r '^ARG BUILDER_IMAGE=.*$' | string replace -r '^ARG BUILDER_IMAGE=' '')
+    if test $status -ne 0; or test (count $builder_image) -ne 1
+        set_color red
+        echo "Failed to resolve the native Node builder image for n8n $n8n_version." 1>&2
+        set_color normal
+        return 1
+    end
+
+    echo $builder_image
+end
+
 set IGNORE_ERRORS "false"
 if contains -- --ignore-errors $argv
     set IGNORE_ERRORS "true"
@@ -182,6 +203,14 @@ set_color yellow
 echo "Targeting N8N version: $N8N_VERSION"
 set_color normal
 
+set -l N8N_NODE_BUILDER_IMAGE (get_n8n_node_builder_image $N8N_VERSION)
+if test $status -ne 0
+    exit 1
+end
+set_color yellow
+echo "Using upstream Node builder: $N8N_NODE_BUILDER_IMAGE"
+set_color normal
+
 run_step "Linting (fixing your sins...)" "pnpm lint --fix"
 run_step "Building (summoning the TypeScript demons...)" "pnpm run build"
 run_step "Packing (compressing your hopes and dreams...)" "pnpm pack"
@@ -194,7 +223,7 @@ set_color yellow
 echo "Using Limescape Docs version: $PACKAGE_VERSION"
 set_color normal
 
-run_step "Docker Build (because it worked on my machine...)" "docker build -f Dockerfile-n8n-v2 --no-cache --build-arg N8N_VERSION=$N8N_VERSION --build-arg LIMESCAPE_DOCS_VERSION=$PACKAGE_VERSION -t tlteamai.azurecr.io/n8n/truelime-n8n:$N8N_VERSION ."
+run_step "Docker Build (because it worked on my machine...)" "docker build -f Dockerfile-n8n-v2 --no-cache --build-arg N8N_VERSION=$N8N_VERSION --build-arg N8N_NODE_BUILDER_IMAGE=$N8N_NODE_BUILDER_IMAGE --build-arg LIMESCAPE_DOCS_VERSION=$PACKAGE_VERSION -t tlteamai.azurecr.io/n8n/truelime-n8n:$N8N_VERSION ."
 
 function push_image
     set -l image $argv[1]
