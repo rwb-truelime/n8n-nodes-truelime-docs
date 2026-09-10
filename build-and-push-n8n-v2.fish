@@ -53,108 +53,61 @@ function run_step
     return $code
 end
 
-function get_latest_v2_version
-    # Allow manual override via environment variable
+function get_stable_v2_version
+    set -l n8n_version
+
+    # An override may select an older stable release, but it is still verified
+    # against n8n's published GitHub release tag below.
     if set -q N8N_VERSION; and test -n "$N8N_VERSION"
-        echo $N8N_VERSION
-        return 0
-    end
+        set n8n_version $N8N_VERSION
+    else
+        # The npm stable dist-tag is the sole automatic version source.
+        if not type -q pnpm
+            set_color red
+            echo "pnpm is required to resolve n8n's stable release." 1>&2
+            set_color normal
+            return 1
+        end
 
-    # Query npm for the 'latest' dist-tag (production version)
-    # This gets the stable release, not bleeding edge
-    if type -q pnpm
-        set -l ver (pnpm view n8n dist-tags.latest 2>/dev/null)
-        if test $status -eq 0; and test -n "$ver"
-            # Verify it's a v2 version
-            if string match -qr '^2\.' $ver
-                echo $ver
-                return 0
-            else
-                set_color yellow
-                echo "Warning: npm 'latest' tag is $ver (not v2). Looking for latest v2..." 1>&2
-                set_color normal
-            end
+        set n8n_version (pnpm view n8n dist-tags.stable 2>/dev/null)
+        if test $status -ne 0; or test (count $n8n_version) -ne 1
+            set_color red
+            echo "Failed to resolve npm's stable n8n release." 1>&2
+            set_color normal
+            return 1
         end
     end
 
-    # Fallback: npm view (if pnpm not available)
-    if type -q npm
-        set -l ver (npm view n8n dist-tags.latest 2>/dev/null)
-        if test $status -eq 0; and test -n "$ver"
-            if string match -qr '^2\.' $ver
-                echo $ver
-                return 0
-            end
-        end
+    if not string match -qr '^2\.[0-9]+\.[0-9]+$' -- $n8n_version
+        set_color red
+        echo "n8n version must be a stable v2 release: $n8n_version" 1>&2
+        set_color normal
+        return 1
     end
 
-    # Second fallback: Get all versions and find the highest stable v2
-    # (only if 'latest' tag is not v2 yet)
-    if type -q pnpm
-        set -l ver_json (pnpm view n8n versions --json 2>/dev/null)
-        if test $status -eq 0
-            set -l ver (echo $ver_json | node -e '
-                try {
-                    const versions = JSON.parse(require("fs").readFileSync(0, "utf-8"));
-                    // Filter for stable v2 versions only (no pre-release tags like -beta, -rc, -next)
-                    const v2 = versions
-                        .filter(v => /^2\.\d+\.\d+$/.test(v))
-                        .sort((a, b) => {
-                            const pa = a.split(".").map(Number);
-                            const pb = b.split(".").map(Number);
-                            for (let i = 0; i < 3; i++) {
-                                if (pa[i] > pb[i]) return 1;
-                                if (pa[i] < pb[i]) return -1;
-                            }
-                            return 0;
-                        });
-                    if (v2.length > 0) console.log(v2[v2.length - 1]);
-                    else process.exit(1);
-                } catch (e) { process.exit(1); }
-            ')
-            if test $status -eq 0; and test -n "$ver"
-                echo $ver
-                return 0
-            end
-        end
+    if not type -q curl
+        set_color red
+        echo "curl is required to verify the n8n release tag." 1>&2
+        set_color normal
+        return 1
     end
 
-    # Third fallback: GitHub Releases API (filter for non-prerelease only)
-    if type -q curl
-        set -l releases_json (curl -fsSL https://api.github.com/repos/n8n-io/n8n/releases 2>/dev/null)
-        if test $status -eq 0
-            set -l ver (echo $releases_json | node -e '
-                try {
-                    const releases = JSON.parse(require("fs").readFileSync(0, "utf-8"));
-                    // Filter: only stable releases (prerelease=false) and v2 versions
-                    const v2 = releases
-                        .filter(r => !r.prerelease && !r.draft)
-                        .map(r => r.tag_name.replace(/^n8n@/, ""))
-                        .filter(v => /^2\.\d+\.\d+$/.test(v))
-                        .sort((a, b) => {
-                            const pa = a.split(".").map(Number);
-                            const pb = b.split(".").map(Number);
-                            for (let i = 0; i < 3; i++) {
-                                if (pa[i] > pb[i]) return 1;
-                                if (pa[i] < pb[i]) return -1;
-                            }
-                            return 0;
-                        });
-                    if (v2.length > 0) console.log(v2[v2.length - 1]);
-                    else process.exit(1);
-                } catch (e) { process.exit(1); }
-            ')
-            if test $status -eq 0; and test -n "$ver"
-                echo $ver
-                return 0
-            end
-        end
+    # npm's channel tag alone is not enough: require the official stable tag.
+    curl -fsSL --retry 3 "https://api.github.com/repos/n8n-io/n8n/releases/tags/n8n%40$n8n_version" | node -e '
+        const fs = require("fs");
+        const release = JSON.parse(fs.readFileSync(0, "utf8"));
+        const version = process.argv[1];
+        if (release.tag_name !== `n8n@${version}` || release.prerelease || release.draft) process.exit(1);
+    ' "$n8n_version"
+    set -l pipe_status $pipestatus
+    if test $pipe_status[1] -ne 0; or test $pipe_status[2] -ne 0
+        set_color red
+        echo "n8n $n8n_version is not a published stable n8n release tag." 1>&2
+        set_color normal
+        return 1
     end
 
-    set_color red
-    echo "Failed to resolve latest N8N V2 version. Set N8N_VERSION env var." 1>&2
-    set_color normal
-    exit 1
+    echo $n8n_version
 end
 
 function get_n8n_node_builder_image
@@ -195,7 +148,7 @@ echo '      Welcome to the Buildpocalypse!'
 set_color normal
 
 # Resolve V2 version FIRST
-set -l N8N_VERSION (get_latest_v2_version)
+set -l N8N_VERSION (get_stable_v2_version)
 if test $status -ne 0
     exit 1
 end
