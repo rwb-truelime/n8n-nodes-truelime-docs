@@ -9,3 +9,4 @@ node_modules
 *.rar
 *.7z
 *.log
+.env
