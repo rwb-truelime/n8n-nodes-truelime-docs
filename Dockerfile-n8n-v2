@@ -4,8 +4,8 @@
 # n8n tag, keeping Node and Alpine ABI-compatible across n8n upgrades.
 # ==============================================================================
 
-ARG N8N_VERSION=2.38.1
-ARG N8N_NODE_BUILDER_IMAGE=node:26.7.0-alpine3.24
+ARG N8N_VERSION=2.38.5
+ARG N8N_NODE_BUILDER_IMAGE=node:26.7.0-alpine3.24@sha256:aadf416b2cdce311a8811ba3f0608a61b77dbf997500e2eafe781b51f6a0b019
 ARG LIMESCAPE_DOCS_VERSION=1.23.0
 
 # ==============================================================================
@@ -48,9 +48,6 @@ RUN echo "dangerously-allow-all-scripts=true" > .npmrc && \
     npm install --legacy-peer-deps https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz --loglevel verbose && \
     npm install --legacy-peer-deps ./limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz --loglevel verbose && \
     npm install --legacy-peer-deps ./n8n-nodes-limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz --loglevel verbose && \
-    npm install --legacy-peer-deps @langfuse/n8n-nodes-langfuse --loglevel verbose && \
-    npm install --legacy-peer-deps n8n-nodes-eml --loglevel verbose && \
-    npm install --legacy-peer-deps n8n-nodes-run-node-with-credentials-x --loglevel verbose && \
     rm -rf /root/.npm /home/node/.n8n/nodes/*.tgz .npmrc
 
 # ==============================================================================
@@ -66,8 +63,7 @@ COPY --from=document-deps /usr/share /usr/share
 COPY --from=document-deps /etc/fonts /etc/fonts
 COPY --from=community-nodes /home/node/.n8n/nodes /home/node/.n8n/nodes
 
-RUN npm i -g langfuse-langchain --loglevel verbose && \
-    ln -s /usr/local/lib/node_modules/n8n/node_modules/n8n-workflow /home/node/.n8n/nodes/node_modules/n8n-workflow && \
+RUN ln -s /usr/local/lib/node_modules/n8n/node_modules/n8n-workflow /home/node/.n8n/nodes/node_modules/n8n-workflow && \
     chown -R node:node /home/node/.n8n
 
 WORKDIR /home/node
