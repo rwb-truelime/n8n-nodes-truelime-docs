@@ -4,7 +4,7 @@
 # n8n tag, keeping Node and Alpine ABI-compatible across n8n upgrades.
 # ==============================================================================
 
-ARG N8N_VERSION=2.38.5
+ARG N8N_VERSION=2.38.6
 ARG N8N_NODE_BUILDER_IMAGE=node:26.7.0-alpine3.24@sha256:aadf416b2cdce311a8811ba3f0608a61b77dbf997500e2eafe781b51f6a0b019
 ARG LIMESCAPE_DOCS_VERSION=1.23.0
 
