@@ -19,7 +19,7 @@ services:
       - n8n-network
 
   n8n:
-    image: limescape-n8n-local:${N8N_VERSION}
+    image: tlteamai.azurecr.io/n8n/truelime-n8n:${N8N_VERSION}
     build:
       context: .
       dockerfile: Dockerfile-n8n-v2
