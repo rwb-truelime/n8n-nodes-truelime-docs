@@ -6,10 +6,10 @@ Purpose: Help AI coding agents work productively in this repository by documenti
 - Node package: Custom n8n community node providing OCR & AI-driven document extraction via `limescape-docs`.
 - Primary components:
   - `nodes/LimescapeDocs/LimescapeDocs.node.ts`: Versioned entry node (Full Versioning for majors), parameters, execution, data shaping.
-  - `credentials/LimescapeDocsApi.credentials.ts`: Credentials schema mapped to multiple model providers.
+  - `credentials/LimescapeDocsApi.credentials.ts` (V1) and `credentials/LimescapeDocsV2Api.credentials.ts` (V2): Credentials schemas mapped to multiple model providers.
   - `icons/` + `gulpfile.js`: Icon build pipeline (`gulp build:icons`).
-  - `package.json`: Scripts, n8n manifest (`n8n.credentials` and `n8n.nodes`), dependency on a local tarball `limescape-docs-1.1.21.tgz`.
-- Key external libs: `n8n-workflow`, `n8n-core` (dev), and `limescape-docs` (local tgz). The node delegates heavy lifting to `limescape-docs`.
+  - `package.json`: Scripts, n8n manifest (`n8n.credentials` and `n8n.nodes`), dependency on local tarballs in the repo root: `limescape-docs-2.0.0.tgz` (V2) and `limescape-docs-1.23.0.tgz` installed as the alias `limescape-docs-v1` (V1).
+- Key external libs: `n8n-workflow` and `limescape-docs` (local tgz). The node delegates heavy lifting to `limescape-docs`.
 
 ## Execution Flow
 - Input: Binary or file path from upstream node/workflow.
@@ -24,22 +24,24 @@ Purpose: Help AI coding agents work productively in this repository by documenti
 
 ## Versioning Conventions
 - Hybrid versioning model matching n8n core:
-  - Light versioning for minor increments inside a major implementation: use version arrays in the version implementation file, e.g. `version: [1.21, 1.22, 1.23]` in `v1`.
-  - Full versioning for breaking changes: use `VersionedNodeType` entry with `nodeVersions` mapping majors (and their minors) to implementations, e.g. `1.21/1.22/1.23 → V1`, `2.0/2.1 → V2`.
+  - Light versioning for minor increments inside a major implementation: use version arrays in the version implementation file, e.g. `version: [1, 1.21, 1.22, 1.23]` in `v1`, `version: [2]` in `v2`.
+  - Full versioning for breaking changes: use `VersionedNodeType` entry with `nodeVersions` mapping majors (and their minors) to implementations, e.g. `1/1.21/1.22/1.23 → V1`, `2 → V2`. Never remove a version: saved workflows keep the version they were created with.
 - Default version selection:
   - Set `defaultVersion` in the entry node to control what new nodes use by default without breaking existing workflows.
 - DisplayOptions and `@version`:
   - Use `@version` checks inside properties to show/hide fields across minor versions in the same major implementation.
 
 ## Project Conventions
-- Provider selection: `modelProvider` is an enum from `limescape-docs` (`OPENAI`, `AZURE`, `AZURE_AIF`, `GOOGLE`, `VERTEX`, `BEDROCK`). Choose model via `model` or override via `customModel`.
+- Provider selection: `modelProvider` is an enum from `limescape-docs` (V2: `OPENAI`, `AZURE`, `AZURE_AIF`, `GOOGLE`, `GEMINI_ENTERPRISE`, `BEDROCK`; V1 uses `VERTEX` instead of `GEMINI_ENTERPRISE`). Choose model via `model` or override via `customModel`.
 - Credentials mapping rules (examples):
   - OpenAI → `apiKey` from `openaiApiKey`.
   - Azure → `apiKey`, `endpoint`, optional `azureApiVersion`.
   - Azure AI Foundry → `baseUrl`, `apiKey`.
   - Google (direct) → `apiKey`.
-  - Vertex → `serviceAccount` (JSON string), `location`.
-  - Bedrock → `region`, optional `accessKeyId`, `secretAccessKey`, `sessionToken`.
+  - Gemini Enterprise (V2, credential `limescapeDocsV2Api`) → `serviceAccount` from `geminiEnterpriseServiceAccount`, `location` from `geminiEnterpriseLocation`.
+  - Vertex (V1, credential `limescapeDocsApi`) → `serviceAccount` from `vertexServiceAccount`, `location` from `vertexLocation`.
+- Credentials are not versioned in n8n: each node major has its own credential type (`limescapeDocsApi` for V1, `limescapeDocsV2Api` for V2).
+  - Bedrock → required `region`, optional `apiKey` (Bedrock API key) or `accessKeyId` + `secretAccessKey` (+ `sessionToken`); none set = AWS SDK default chain.
 - Schema input: Accepts stringified JSON. Empty (`""` or `{}`) treated as undefined. Parsing failure throws `NodeOperationError`.
 - Pages input: Use `"1,3-5"` style for `pagesToConvertAsImages` (converts to `number[]`).
 - Extract Per Page Keys: `multiOptions` field populated dynamically from schema properties via `loadOptionsMethod: 'getSchemaPropertyKeys'`. Accepts top-level schema keys (e.g., `["lineItems", "transactions"]`) to extract per page. The library splits schema into per-page and full-document portions.
@@ -61,7 +63,7 @@ Purpose: Help AI coding agents work productively in this repository by documenti
   - `pnpm lintfix`: Same with `--fix`.
   - `pnpm format`: Prettier format `nodes` and `credentials`.
   - `pnpm prepublishOnly`: Build and lint before publish.
-- Node/TS versions: Node `>=18.10` in `engines`; repo dev deps reference latest ESLint/TS. Types require `n8n-workflow`/`n8n-core` dev deps.
+- Node/TS versions: Node `>=22.12` in `engines` (required by limescape-docs 2.x); repo dev deps reference latest ESLint/TS. Types require the `n8n-workflow` dev dep.
 - n8n manifest:
   - Ensure node and credentials point to compiled JS files under `dist/**` in `package.json` `n8n` section.
 

@@ -2,6 +2,7 @@ import type { INodeTypeBaseDescription, IVersionedNodeType } from 'n8n-workflow'
 import { VersionedNodeType } from 'n8n-workflow';
 
 import { LimescapeDocsV1 } from './v1/LimescapeDocsV1.node';
+import { LimescapeDocsV2 } from './v2/LimescapeDocsV2.node';
 
 /**
  * LimescapeDocs Versioned Node
@@ -64,6 +65,10 @@ import { LimescapeDocsV1 } from './v1/LimescapeDocsV1.node';
  * =============================================================================
  * - 1.22: Initial versioned release (maps to limescape-docs 1.22.x)
  *         Uses LimescapeDocsV1 implementation
+ * - 2:    Breaking release on limescape-docs 2.0.0 (Gemini Enterprise replaces Vertex,
+ *         new model lists, version-neutral Gemini options). Uses LimescapeDocsV2.
+ *         V1 stays on limescape-docs 1.23.0, installed under the alias
+ *         `limescape-docs-v1`, so existing 1.x workflows keep working unchanged.
  *
  */
 export class LimescapeDocs extends VersionedNodeType {
@@ -75,7 +80,7 @@ export class LimescapeDocs extends VersionedNodeType {
             group: ['transform'],
             subtitle: '={{$parameter["operation"]}}',
             description: 'OCR & Document Extraction using AI models via Limescape Docs',
-            defaultVersion: 1.23,  // ← UPDATE THIS when adding new versions
+            defaultVersion: 2,  // ← UPDATE THIS when adding new versions
         };
 
         // =====================================================================
@@ -87,10 +92,11 @@ export class LimescapeDocs extends VersionedNodeType {
             1: new LimescapeDocsV1(baseDescription),
             1.21: new LimescapeDocsV1(baseDescription),
             1.22: new LimescapeDocsV1(baseDescription),
-            1.23: new LimescapeDocsV1(baseDescription)
+            1.23: new LimescapeDocsV1(baseDescription),
+            2: new LimescapeDocsV2(baseDescription),
             // Future versions:
-            // 1.23: new LimescapeDocsV1(baseDescription),  // If backward compatible
-            // 2: new LimescapeDocsV2(baseDescription),     // If breaking changes
+            // 2.1: new LimescapeDocsV2(baseDescription),  // If backward compatible
+            // 3: new LimescapeDocsV3(baseDescription),    // If breaking changes
         };
 
         super(nodeVersions, baseDescription);

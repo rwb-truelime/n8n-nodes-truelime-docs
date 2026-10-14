@@ -22,7 +22,7 @@ import {
     ErrorMode as LimescapeErrorMode,
     Gemini3ThinkingLevel,
     Gemini3MediaResolution,
-} from 'limescape-docs';
+} from 'limescape-docs-v1'; // limescape-docs 1.23.0, installed under an alias so V1 keeps its original behavior
 
 // Helper function to safely create a temporary directory if needed
 const ensureDirSync = (dirPath: string) => {

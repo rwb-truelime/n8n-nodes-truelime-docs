@@ -37,13 +37,21 @@ below) that isn't available on hosted runners, so `pnpm install` fails. Re-enabl
 tarball built from a sibling repo:
 
 ```
-"limescape-docs": "file:/home/rodger/truelime-git-projects/limescape-ai-limescape-docs/limescape-docs-1.23.0.tgz"
+"limescape-docs": "file:./limescape-docs-2.0.0.tgz",
+"limescape-docs-v1": "file:./limescape-docs-1.23.0.tgz"
 ```
 
 - The node's TypeScript imports (`limescapeDocs`, `LimescapeDocsArgs`, `ModelCredentials`,
-  `LLMParams`, `ModelProvider`, `ErrorMode`) all come from this library. Its types define
+  `LLMParams`, `ModelProvider`, `ModelOptions`, `ErrorMode`, `GeminiThinkingLevel`, `GeminiMediaResolution`) all come from this library. Its types define
   the contract the node builds against.
-- To pick up library changes you must re-pack that sibling repo and reinstall the `.tgz`.
+- The tarball is packed in the sibling repo `limescape-ai-limescape-docs` and copied into this
+  repo's root (gitignored via `*.tgz`; `Dockerfile-n8n-v2` `COPY`s it from here). To pick up library
+  changes, re-pack there, copy the `.tgz` here and reinstall.
+- The library requires Node `>=22.12` (CJS that `require()`s ESM-only deps).
+- **Two library versions are installed side by side.** V2 imports `limescape-docs` (2.0.0); V1
+  imports `limescape-docs-v1`, an alias for 1.23.0, so saved 1.x workflows keep their exact
+  behavior. `Dockerfile-n8n-v2` installs both (`LIMESCAPE_DOCS_V1_VERSION`). Never point V1 at
+  the 2.x library, and never delete a version from `nodeVersions`.
 - It also appears under `pnpm.onlyBuiltDependencies` in `pnpm-workspace.yaml` alongside
   native deps (`sharp`, `tesseract.js`, `isolated-vm`, etc.) so their build scripts run.
 
@@ -54,14 +62,17 @@ tarball built from a sibling repo:
 - `nodes/LimescapeDocs/LimescapeDocs.node.ts` — the `VersionedNodeType` **entry class**.
   It only maps version numbers → implementations (`nodeVersions`) and sets
   `defaultVersion`. No logic lives here.
-- `nodes/LimescapeDocs/v1/LimescapeDocsV1.node.ts` — the actual `INodeType`
+- `nodes/LimescapeDocs/v2/LimescapeDocsV2.node.ts` — the actual `INodeType`
   implementation (~1000 lines): property schema, `loadOptions`, and `execute`.
-- **Light versioning** (backward-compatible minor bumps, e.g. 1.22 → 1.23): add the version
-  to the V1 `version: [...]` array *and* map it to the same `LimescapeDocsV1` in the entry
+- `nodes/LimescapeDocs/v1/LimescapeDocsV1.node.ts` — the frozen V1 implementation for saved
+  1/1.21/1.22/1.23 workflows, on limescape-docs 1.23.0 via the `limescape-docs-v1` alias.
+- **Light versioning** (backward-compatible minor bumps, e.g. 2 → 2.1): add the version
+  to the V2 `version: [...]` array *and* map it to the same `LimescapeDocsV2` in the entry
   class's `nodeVersions`.
-- **Full versioning** (breaking changes): create `v2/LimescapeDocsV2.node.ts`, import it,
-  and map new versions to it. Old versions must keep pointing at V1 so existing workflows
-  never break. The entry class file has a detailed header comment explaining both paths.
+- **Full versioning** (breaking changes): create `v3/LimescapeDocsV3.node.ts`, import it,
+  and map new versions to it. Old versions must keep pointing at their implementation so
+  existing workflows keep working (if the library breaks the old API, install the old library
+  under an alias, as done for V1). The entry class file has a detailed header comment explaining both paths.
 - For minor-version-specific field behavior within one major, use `@version` checks in a
   property's `displayOptions` to show/hide it.
 
@@ -69,12 +80,12 @@ tarball built from a sibling repo:
 
 A version bump touches several places that must agree:
 `package.json` `version` → `nodes/.../LimescapeDocs.node.json` `nodeVersion` → entry class
-`defaultVersion` + `nodeVersions` map → V1 `version: [...]` array.
+`defaultVersion` + `nodeVersions` map → V2 `version: [...]` array.
 
-### Execution flow (`LimescapeDocsV1.execute`)
+### Execution flow (`LimescapeDocsV2.execute`)
 
 1. Read global parameters once (provider, model, schema, the four collection params).
-2. Validate safeguards: `maxTokens` must be 1024–16383; `imageDensity` ≥ 70.
+2. Validate safeguards: `maxTokens` must be 1024–65536; `imageDensity` ≥ 70.
 3. Map n8n credentials → library `ModelCredentials` via `mapCredentialsForProvider`
    (also does per-provider required-field validation).
 4. Loop over input items. Per item: apply the **attachment filter** (include/exclude by
@@ -87,26 +98,36 @@ A version bump touches several places that must agree:
 6. `extractPageByPage` changes aggregation: `aggregatedExtracted` becomes an array of
    per-page objects (from `result.pages[].extracted`) instead of per-file.
 
-### Helper functions (top of the V1 file)
+### Helper functions (top of the V2 file)
 
 `parsePages` (parses `"1,3-5"` ranges), `buildLLMParams` (collection → `LLMParams`,
-skipping empty values), `parseSchema` (JSON string → object, throws `NodeOperationError`
+skipping empty values and dropping keys the library rejects for the provider: `logprobs` outside
+OpenAI/Azure/AIF, penalties on Bedrock), `parseSchema` (JSON string → object, throws `NodeOperationError`
 on bad JSON), `mapCredentialsForProvider`, `buildLimescapeArgsForItem`.
 
 ### loadOptions methods
 
-- `getModelsForProvider` — populates the Model dropdown per selected provider. **Model
-  lists are hardcoded here** and must be kept in sync with what the library/providers
-  support. The `extractionModel` options list is a separate hardcoded list.
+- `getModelsForProvider` / `getExtractionModelsForProvider` — populate the Model dropdowns
+  per (extraction) provider from the shared `GPT_MODELS` / `GEMINI_MODELS` / `BEDROCK_MODELS`
+  presets. Values come from the library's `ModelOptions` enum, so a model the library removes
+  becomes a compile error. Models not yet in the library go through Custom Model.
 - `getSchemaPropertyKeys` — parses the Schema JSON to offer top-level keys for the
   "Extract Per Page Keys" multiOptions field.
 
 ### Credentials
 
-One credential type `limescapeDocsApi` (`credentials/LimescapeDocsApi.credentials.ts`)
-holds fields for **all six providers** (OpenAI, Azure OpenAI, Azure AI Foundry, Google
-Gemini, Google Vertex, AWS Bedrock). `mapCredentialsForProvider` picks the relevant subset
-at runtime based on the selected provider.
+Credentials are **not versioned** in n8n, so each node major has its own credential type:
+
+- V1 → `limescapeDocsApi` (`credentials/LimescapeDocsApi.credentials.ts`): frozen; Google
+  Vertex fields (`vertexServiceAccount`, `vertexLocation`). Drop it together with V1.
+- V2 → `limescapeDocsV2Api` (`credentials/LimescapeDocsV2Api.credentials.ts`): Gemini
+  Enterprise (`geminiEnterpriseServiceAccount`, `geminiEnterpriseLocation`) and the Bedrock
+  API key (`bedrockApiKey`).
+
+Each holds fields for **all six providers**; `mapCredentialsForProvider` picks the relevant
+subset at runtime. Never change a stored field of a credential type an existing node version
+uses; a breaking credential change gets a new credential type with the new node major.
+Both are registered in `package.json` `n8n.credentials`.
 
 ## Deployment (Docker → Azure Container Registry)
 
@@ -122,10 +143,10 @@ version (override with `N8N_VERSION`). Requires `az acr login --name tlteamai` /
 
 ## Adding a new provider
 
-1. Add `INodeProperties` fields for its credentials in `LimescapeDocsApi.credentials.ts`.
+1. Add `INodeProperties` fields for its credentials in `LimescapeDocsV2Api.credentials.ts`.
 2. Add a branch to `mapCredentialsForProvider` building the library `ModelCredentials`.
-3. Add the provider to the `modelProvider` (and `extractionModelProvider`) `options`, and
-   add its model presets to `getModelsForProvider`.
+3. Add the provider to `PROVIDER_OPTIONS` (used by `modelProvider` and `extractionModelProvider`),
+   and add its model presets to `modelsForProvider`.
 4. Wire any provider-specific args through `buildLimescapeArgsForItem` if needed.
 
 ## Conventions
@@ -135,3 +156,6 @@ version (override with `N8N_VERSION`). Requires `az acr login --name tlteamai` /
 - User-facing errors use `NodeOperationError` (with `itemIndex`), never bare throws.
 - Every node property carries both a `description` and a `hint`.
 - The current branch `n8n-upgrade-to-v2` targets `n8n-workflow` v2 peer deps (`^2.15.0`).
+- Google providers (`GOOGLE`, `GEMINI_ENTERPRISE`): the library strips temperature/topP/topK,
+  so the node hides them; Gemini Options (thinking level, media resolution) are shown per
+  provider, never per model-name prefix.

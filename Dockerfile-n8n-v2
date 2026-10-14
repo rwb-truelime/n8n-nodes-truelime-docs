@@ -6,7 +6,9 @@
 
 ARG N8N_VERSION=2.43.4
 ARG N8N_NODE_BUILDER_IMAGE=node:26.7.0-alpine3.24@sha256:aadf416b2cdce311a8811ba3f0608a61b77dbf997500e2eafe781b51f6a0b019
-ARG LIMESCAPE_DOCS_VERSION=1.23.0
+ARG LIMESCAPE_DOCS_VERSION=2.0.0
+# Library version used by node V1 (typeVersion 1.x), installed under the alias limescape-docs-v1.
+ARG LIMESCAPE_DOCS_V1_VERSION=1.23.0
 
 # ==============================================================================
 # STAGE 1: Document Runtime Dependencies
@@ -35,6 +37,7 @@ RUN apk add --no-cache \
 FROM document-deps AS community-nodes
 
 ARG LIMESCAPE_DOCS_VERSION
+ARG LIMESCAPE_DOCS_V1_VERSION
 
 RUN apk add --no-cache python3 make g++
 
@@ -42,11 +45,13 @@ WORKDIR /home/node/.n8n/nodes
 
 COPY n8n-nodes-limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz ./
 COPY limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz ./
+COPY limescape-docs-${LIMESCAPE_DOCS_V1_VERSION}.tgz ./
 
 RUN echo "dangerously-allow-all-scripts=true" > .npmrc && \
     echo "allow-remote=all" >> .npmrc && \
     npm install --legacy-peer-deps https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz --loglevel verbose && \
     npm install --legacy-peer-deps ./limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz --loglevel verbose && \
+    npm install --legacy-peer-deps limescape-docs-v1@file:./limescape-docs-${LIMESCAPE_DOCS_V1_VERSION}.tgz --loglevel verbose && \
     npm install --legacy-peer-deps ./n8n-nodes-limescape-docs-${LIMESCAPE_DOCS_VERSION}.tgz --loglevel verbose && \
     rm -rf /root/.npm /home/node/.n8n/nodes/*.tgz .npmrc
 

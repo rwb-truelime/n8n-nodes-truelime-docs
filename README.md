@@ -6,7 +6,7 @@ Custom n8n community node providing OCR & AI-driven document extraction via [\`l
 
 ## Features
 
-- **Multi-Provider Support**: Works with OpenAI, Azure OpenAI, Azure AI Foundry, Google Gemini, Google Vertex AI, and AWS Bedrock
+- **Multi-Provider Support**: Works with OpenAI, Azure OpenAI, Azure AI Foundry, Google Gemini, Google Gemini Enterprise, and AWS Bedrock
 - **OCR & Document Processing**: Convert PDFs and images to structured text using vision models
 - **Schema-Based Extraction**: Extract structured data from documents using JSON schemas
 - **Page-by-Page Extraction**: Process each page as a separate LLM call to prevent hallucination on large documents
@@ -34,7 +34,7 @@ pnpm add n8n-nodes-limescape-docs
 Before using the node, configure credentials for your AI provider(s) in n8n:
 
 1. Go to **Credentials** > **New Credential**
-2. Search for **Limescape Docs Credentials API**
+2. Search for **Limescape Docs V2 Credentials API** (node v2). Existing v1 nodes keep using **Limescape Docs Credentials API**.
 3. Fill in the credentials for your provider(s):
 
 | Provider | Required Fields |
@@ -43,8 +43,8 @@ Before using the node, configure credentials for your AI provider(s) in n8n:
 | **Azure OpenAI** | API Key, Endpoint, (optional) API Version |
 | **Azure AI Foundry** | Base URL, API Key |
 | **Google Gemini** | API Key |
-| **Google Vertex AI** | Service Account JSON, Location |
-| **AWS Bedrock** | Region, (optional) Access Key ID, Secret Access Key, Session Token |
+| **Google Gemini Enterprise** | Service Account JSON, Location (`global` or `eu`; Gemini 3.1 Pro needs `global`) |
+| **AWS Bedrock** | Region, plus a Bedrock API Key **or** Access Key ID + Secret Access Key (+ optional Session Token); leave all empty to use the AWS default credential chain |
 
 ## Node Configuration
 
@@ -52,9 +52,10 @@ Before using the node, configure credentials for your AI provider(s) in n8n:
 
 | Option | Description |
 |--------|-------------|
-| **Model Provider** | Select your AI provider |
-| **Model** | Choose from preset models or use custom |
+| **Model Provider** | Select your AI provider (default: Google Gemini Enterprise) |
+| **Model** | Choose from preset models or use custom (default: Gemini 3.8 Flash) |
 | **Custom Model** | Override with a specific model ID |
+| **Gemini Options** | Thinking Level and Media Resolution, shown when a Google provider is used |
 | **Schema** | JSON schema for structured data extraction |
 | **Input Binary Field** | Name of the binary property containing the file (default: \`data\`) |
 
@@ -85,21 +86,22 @@ Override model/provider specifically for the extraction step:
 | Option | Description |
 |--------|-------------|
 | Extraction Model Provider | Different provider for extraction |
-| Extraction Model | Different model for extraction |
+| Extraction Model | Different model for extraction (default: empty, uses the main model) |
 | Custom Extraction Model | Custom model ID for extraction |
 | Extraction Prompt | Specific prompt for extraction step |
 
 ### LLM Parameters
 
-Fine-tune model behavior for both OCR and extraction steps:
+Fine-tune model behavior for both OCR and extraction steps. Fields the selected provider does not support are hidden:
 
 | Parameter | Description |
 |-----------|-------------|
-| Temperature | Controls randomness (0.0-2.0) |
-| Top P | Nucleus sampling threshold |
-| Frequency Penalty | Reduce repetition of token sequences |
-| Presence Penalty | Reduce repetition of topics |
-| Max Tokens | Maximum tokens in response |
+| Temperature | Controls randomness (0.0-2.0). Not available for Google providers; ignored by Bedrock Claude 5 |
+| Top P | Nucleus sampling threshold. Not available for Google providers; ignored by Bedrock Claude 5 |
+| Frequency Penalty | Reduce repetition of token sequences. Not available for Bedrock |
+| Presence Penalty | Reduce repetition of topics. Not available for Bedrock |
+| Log Probabilities | Return token log probabilities. OpenAI, Azure and Azure AI Foundry only |
+| Max Tokens | Maximum tokens in response (1024–65536, default 16000) |
 
 ## Output Structure
 
@@ -114,12 +116,15 @@ The node outputs a single item with aggregated results:
   "totalCompletionTime": 5000,
   "totalInputTokens": 1500,
   "totalOutputTokens": 800,
+  "totalReasoningTokens": 200,
   "totalPagesProcessed": 3,
   "aggregatedExtracted": [{ "invoiceNumber": "INV-001" }],
   "aggregatedSummaries": "...",
   "processingIssues": []
 }
 \`\`\`
+
+`totalReasoningTokens` is already included in `totalOutputTokens`.
 
 ### Page-by-Page Mode
 
@@ -129,7 +134,7 @@ When \`Extract Page-by-Page\` is enabled, \`aggregatedExtracted\` contains an ar
 
 ### Prerequisites
 
-- **Node.js** >= 18.10
+- **Node.js** >= 22.12
 - **pnpm** >= 9.1
 
 ### Setup
@@ -167,20 +172,23 @@ pnpm dev
 
 This project follows n8n's hybrid versioning model:
 
-- **Light versioning**: Minor updates within a major version use version arrays (e.g., \`version: [1.21, 1.22, 1.23]\`)
+- **Light versioning**: Minor updates within a major version use version arrays (e.g., \`version: [2, 2.1]\`)
 - **Full versioning**: Breaking changes create new major implementations with \`VersionedNodeType\`
 
 ## Project Structure
 
 \`\`\`
 ├── credentials/
-│   └── LimescapeDocsApi.credentials.ts   # Provider credentials schema
+│   ├── LimescapeDocsApi.credentials.ts   # V1 provider credentials
+│   └── LimescapeDocsV2Api.credentials.ts # V2 provider credentials
 ├── nodes/
 │   └── LimescapeDocs/
 │       ├── LimescapeDocs.node.ts         # Versioned entry node
 │       ├── LimescapeDocs.node.json       # Node metadata
-│       └── v1/
-│           └── LimescapeDocsV1.node.ts   # V1 implementation
+│       ├── v1/
+│       │   └── LimescapeDocsV1.node.ts   # V1 implementation (limescape-docs 1.23, kept for 1.x workflows)
+│       └── v2/
+│           └── LimescapeDocsV2.node.ts   # V2 implementation (limescape-docs 2.x)
 ├── icons/                                 # Node icons
 ├── package.json
 └── tsconfig.json

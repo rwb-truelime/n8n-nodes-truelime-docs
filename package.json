@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-limescape-docs",
-  "version": "1.23.0",
+  "version": "2.0.0",
   "description": "N8N node for Limescape Docs OCR & Document Extraction",
   "keywords": [
     "n8n-community-node-package",
@@ -25,7 +25,7 @@
     "url": "https://github.com/rwb-truelime/n8n-nodes-truelime-doc.git"
   },
   "engines": {
-    "node": ">=18.10",
+    "node": ">=22.12",
     "pnpm": ">=9.1"
   },
   "packageManager": "pnpm@10.23.0+sha512.21c4e5698002ade97e4efe8b8b4a89a8de3c85a37919f957e7a0f30f38fbc5bbdd05980ffe29179b2fb6e6e691242e098d945d1601772cad0fef5fb6411e2a4b",
@@ -45,7 +45,8 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/LimescapeDocsApi.credentials.js"
+      "dist/credentials/LimescapeDocsApi.credentials.js",
+      "dist/credentials/LimescapeDocsV2Api.credentials.js"
     ],
     "nodes": [
       "dist/nodes/LimescapeDocs/LimescapeDocs.node.js"
@@ -53,19 +54,20 @@
   },
   "peerDependencies": {
     "limescape-docs": "*",
+    "limescape-docs-v1": "*",
     "n8n-workflow": "^2.15.0"
   },
   "devDependencies": {
-    "@n8n/node-cli": "^0.31.1",
     "@eslint/eslintrc": "^3.3.7",
     "@eslint/js": "9.39.4",
+    "@n8n/node-cli": "^0.31.1",
     "@typescript-eslint/parser": "^8.70.0",
     "eslint": "9.39.4",
     "eslint-plugin-n8n-nodes-base": "^1.16.7",
     "globals": "^17.12.0",
     "gulp": "^5.0.1",
-    "limescape-docs": "file:/home/rodger/truelime-git-projects/limescape-ai-limescape-docs/limescape-docs-1.23.0.tgz",
-    "n8n-core": "^2.16.1",
+    "limescape-docs": "file:./limescape-docs-2.0.0.tgz",
+    "limescape-docs-v1": "file:./limescape-docs-1.23.0.tgz",
     "n8n-workflow": "^2.16.0",
     "prettier": "^3.9.6",
     "typescript": "5.9.3"
