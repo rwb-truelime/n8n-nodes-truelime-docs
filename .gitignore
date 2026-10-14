@@ -10,3 +10,4 @@ node_modules
 *.7z
 *.log
 .env
+.claude
