@@ -72,7 +72,6 @@ Before using the node, configure credentials for your AI provider(s) in n8n:
 | Extract Only | \`false\` | Skip OCR and only perform extraction |
 | Extract Page-by-Page | \`false\` | Process each page as a separate LLM extraction call |
 | Extract Per Page Keys | \`[]\` | Schema keys to extract per page (top-level only) |
-| Image Density (DPI) | \`150\` | Resolution for image conversion |
 | Image Format | \`png\` | Intermediate image format (PNG or JPEG) |
 | Image Height (Pixels) | \`2048\` | Target height for image resizing |
 | Maintain Format | \`false\` | Preserve original formatting in markdown |
@@ -94,15 +93,10 @@ Override model/provider specifically for the extraction step:
 
 ### LLM Parameters
 
-Fine-tune model behavior for both OCR and extraction steps. Fields the selected provider does not support are hidden:
+Set separately for the OCR step (LLM Parameters) and the extraction step (Extraction LLM Parameters; defaults to the main values). All supported models run with reasoning/thinking on, so sampling settings (temperature, top P, penalties, log probabilities) are not offered:
 
 | Parameter | Description |
 |-----------|-------------|
-| Temperature | Controls randomness (0.0-2.0). Not available for Google providers; some models ignore it |
-| Top P | Nucleus sampling threshold. Not available for Google providers; some models ignore it |
-| Frequency Penalty | Reduce repetition of token sequences. Not available for Bedrock |
-| Presence Penalty | Reduce repetition of topics. Not available for Bedrock |
-| Log Probabilities | Return token log probabilities. OpenAI, Azure and Azure AI Foundry only |
 | Max Tokens | Maximum tokens in response (default 16000). Check the model card for the supported maximum; the API rejects unsupported values |
 
 ## Output Structure

@@ -15,7 +15,7 @@ Purpose: Help AI coding agents work productively in this repository by documenti
 - Input: Binary or file path from upstream node/workflow.
 - The node constructs `LimescapeDocsArgs` using helpers:
   - `parsePages(...)`: Convert comma-separated ranges → numeric arrays.
-  - `buildLLMParams(...)`: Convert numeric/string UI inputs → `LLMParams`.
+  - `buildLLMParams(...)`: Convert the LLM Parameters collection → `LLMParams` (only `maxTokens`; the library rejects sampling params).
   - `parseSchema(...)`: Parse JSON schema string → object; errors become `NodeOperationError`.
   - `mapCredentialsForProvider(...)`: Translate n8n credential properties to `ModelCredentials` for provider.
   - `buildLimescapeArgsForItem(...)`: Assemble `filePath`, model/provider, extraction options, `llmParams`.
@@ -81,7 +81,7 @@ Purpose: Help AI coding agents work productively in this repository by documenti
 ## Example: Adding a New Provider Field
 - Extend `LimescapeDocsApi.credentials.ts` with new `INodeProperties` entries.
 - Update `mapCredentialsForProvider(...)` to construct `ModelCredentials` for the new provider.
-- Add option in `modelProvider` and model presets in `Model` options.
+- Add the provider to `PROVIDER_OPTIONS`. Model dropdowns come from the library catalog (`getModelsForProvider`); never hardcode models in the node.
 - Wire through `buildLimescapeArgsForItem(...)` if special args required.
 
 ## Local Testing Tips

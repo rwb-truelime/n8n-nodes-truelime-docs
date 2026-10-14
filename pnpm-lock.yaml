@@ -2600,7 +2600,7 @@ packages:
     version: 1.23.0
 
   limescape-docs@file:limescape-docs-2.0.0.tgz:
-    resolution: {integrity: sha512-PfaI8QAaZW1lUVsdYGp2ctwYftQgCiSjwYbO/cOORe30xGOEwRTDeBU0ATu02ceFyzjjh+ydadxXOjQqnLzBBg==, tarball: file:limescape-docs-2.0.0.tgz}
+    resolution: {integrity: sha512-8dmGNm3KemWa1fG+Z03YczrwL/8t+Cey4kJojOEZ1iJ7mmfCBg9JhzPR0xlIw2eBuitLmW9BxlgFguixDqtxcg==, tarball: file:limescape-docs-2.0.0.tgz}
     version: 2.0.0
     engines: {node: '>=22.12'}
 

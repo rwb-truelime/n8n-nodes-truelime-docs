@@ -21,6 +21,7 @@ import {
     ModelProvider as LimescapeModelProvider,
     ErrorMode as LimescapeErrorMode,
     ModelOptions,
+    getModelsForProvider,
     GeminiThinkingLevel,
     GeminiMediaResolution,
 } from 'limescape-docs';
@@ -28,11 +29,6 @@ import {
 const GOOGLE_PROVIDERS: string[] = [LimescapeModelProvider.GOOGLE, LimescapeModelProvider.GEMINI_ENTERPRISE];
 // Azure providers address a deployment (any name the user chose), not a model ID.
 const AZURE_PROVIDERS: string[] = [LimescapeModelProvider.AZURE, LimescapeModelProvider.AZURE_AIF];
-const LOGPROBS_PROVIDERS: string[] = [
-    LimescapeModelProvider.OPENAI,
-    LimescapeModelProvider.AZURE,
-    LimescapeModelProvider.AZURE_AIF,
-];
 
 const PROVIDER_OPTIONS: INodePropertyOptions[] = [
     { name: 'OpenAI', value: LimescapeModelProvider.OPENAI },
@@ -43,34 +39,10 @@ const PROVIDER_OPTIONS: INodePropertyOptions[] = [
     { name: 'AWS Bedrock', value: LimescapeModelProvider.BEDROCK },
 ];
 
-// Model presets per provider. Values come from the library's ModelOptions enum so removed
-// models surface as compile errors. Other models can still be used via the Custom Model field.
-const GPT_MODELS: INodePropertyOptions[] = [
-    { name: 'GPT-6 Astra', value: ModelOptions.OPENAI_GPT_6_ASTRA },
-    { name: 'GPT-6 Sol', value: ModelOptions.OPENAI_GPT_6_SOL },
-    { name: 'GPT-6 Luna', value: ModelOptions.OPENAI_GPT_6_LUNA },
-];
-const GEMINI_MODELS: INodePropertyOptions[] = [
-    { name: 'Gemini 3.8 Flash', value: ModelOptions.GOOGLE_GEMINI_3_8_FLASH },
-    { name: 'Gemini 3.1 Pro Preview', value: ModelOptions.GOOGLE_GEMINI_3_1_PRO_PREVIEW },
-    { name: 'Gemini 3.5 Flash', value: ModelOptions.GOOGLE_GEMINI_3_5_FLASH },
-    { name: 'Gemini 3.5 Flash-Lite', value: ModelOptions.GOOGLE_GEMINI_3_5_FLASH_LITE },
-    { name: 'Gemini 3.1 Flash-Lite', value: ModelOptions.GOOGLE_GEMINI_3_1_FLASH_LITE },
-];
-const BEDROCK_MODELS: INodePropertyOptions[] = [
-    { name: 'Claude Opus 5.5 (EU)', value: ModelOptions.BEDROCK_CLAUDE_OPUS_5_5_EU },
-    { name: 'Claude Opus 5.5 (Global)', value: ModelOptions.BEDROCK_CLAUDE_OPUS_5_5_GLOBAL },
-    { name: 'Claude Fable 5.1 (Global)', value: ModelOptions.BEDROCK_CLAUDE_FABLE_5_1_GLOBAL },
-    { name: 'Claude Sonnet 5 (EU)', value: ModelOptions.BEDROCK_CLAUDE_SONNET_5_EU },
-    { name: 'Claude Sonnet 5 (Global)', value: ModelOptions.BEDROCK_CLAUDE_SONNET_5_GLOBAL },
-];
-
-const modelsForProvider = (provider: string | undefined): INodePropertyOptions[] => {
-    if (provider === LimescapeModelProvider.OPENAI) return GPT_MODELS;
-    if (provider && GOOGLE_PROVIDERS.includes(provider)) return GEMINI_MODELS;
-    if (provider === LimescapeModelProvider.BEDROCK) return BEDROCK_MODELS;
-    return [];
-};
+// Model dropdown options come from the library catalog (IDs, display names, provider mapping and
+// order). Other models can still be used via the Custom Model field.
+const modelOptionsForProvider = (provider: string): INodePropertyOptions[] =>
+    getModelsForProvider(provider as LimescapeModelProvider).map((m) => ({ name: m.displayName, value: m.id }));
 
 // Helper function to safely create a temporary directory if needed
 const ensureDirSync = (dirPath: string) => {
@@ -113,38 +85,13 @@ const parsePages = (pagesStr: string | undefined): number[] | undefined => {
     return result.length > 0 ? result : undefined;
 };
 
-// Helper to build LLM params from n8n collection input. Drops keys the library rejects for
-// the given provider (hidden fields keep their stored value when the provider changes).
-const buildLLMParams = (input: IDataObject, provider: string): Partial<LLMParams> => {
-    const params: Partial<Record<string, unknown>> = {};
-
-    if (input.temperature !== undefined && input.temperature !== null && input.temperature !== '') {
-        params.temperature = Number(input.temperature);
-    }
-    if (input.topP !== undefined && input.topP !== null && input.topP !== '') {
-        params.topP = Number(input.topP);
-    }
-    if (input.frequencyPenalty !== undefined && input.frequencyPenalty !== null && input.frequencyPenalty !== '') {
-        params.frequencyPenalty = Number(input.frequencyPenalty);
-    }
-    if (input.presencePenalty !== undefined && input.presencePenalty !== null && input.presencePenalty !== '') {
-        params.presencePenalty = Number(input.presencePenalty);
-    }
+// Helper to build LLM params from n8n collection input. The library only accepts maxTokens.
+const buildLLMParams = (input: IDataObject): Partial<LLMParams> => {
+    const params: Partial<LLMParams> = {};
     if (input.maxTokens !== undefined && input.maxTokens !== null && input.maxTokens !== '') {
         params.maxTokens = Number(input.maxTokens);
     }
-    if (input.logprobs !== undefined && input.logprobs !== null && input.logprobs !== '') {
-        params.logprobs = Boolean(input.logprobs);
-    }
-
-    if (!LOGPROBS_PROVIDERS.includes(provider)) {
-        delete params.logprobs;
-    }
-    if (provider === LimescapeModelProvider.BEDROCK) {
-        delete params.frequencyPenalty;
-        delete params.presencePenalty;
-    }
-    return params as Partial<LLMParams>;
+    return params;
 };
 
 // Helper to parse schema once from node parameter
@@ -335,7 +282,6 @@ const buildLimescapeArgsForItem = (input: BuildArgsInput): LimescapeDocsArgs => 
     if (po.enableHybridExtraction !== undefined) args.enableHybridExtraction = po.enableHybridExtraction as boolean;
     if (po.extractOnly !== undefined) args.extractOnly = po.extractOnly as boolean;
     if (po.extractPageByPage !== undefined) args.extractPageByPage = po.extractPageByPage as boolean;
-    if (po.imageDensity !== undefined) args.imageDensity = Number(po.imageDensity);
     if (po.imageHeight !== undefined) args.imageHeight = Number(po.imageHeight);
     if (po.imageFormat) args.imageFormat = po.imageFormat as 'png' | 'jpeg';
     if (po.maintainFormat !== undefined) args.maintainFormat = po.maintainFormat as boolean;
@@ -501,6 +447,28 @@ const versionDescription: INodeTypeDescription = {
             },
         },
         {
+            displayName: 'Input Binary Field',
+            name: 'binaryPropertyName',
+            type: 'string',
+            default: 'data',
+            required: true,
+            description: 'Name of the binary property in the input item containing the file data',
+            hint: 'Specify the field name holding the file data in the input item. Default: data. Required field.',
+        },
+        
+        {
+            displayName: 'Schema (Optional)',
+            name: 'schema',
+            type: 'json',
+            default: '{"type":"object","properties":{"pages":{"type":"array","description":"List of pages extracted from the document.","items":{"type":"object","properties":{"page_number":{"type":"integer","description":"The sequential number of the page."},"zones":{"type":"array","description":"List of distinct spatial zones (text blocks, tables, or images) found on this page.","items":{"type":"object","properties":{"type":{"type":"string","enum":["text_block","table","image","handwriting","header","footer"],"description":"The classification of the content in this zone."},"content_verbatim":{"type":"string","description":"For text/tables: The exact text found in this zone, preserving newlines and spacing. For images: null."},"image_description":{"type":"string","description":"For images: A detailed visual description of the image content. For text: null."},"position":{"type":"string","enum":["top_left","top_center","top_right","middle_left","center","middle_right","bottom_left","bottom_center","bottom_right"],"description":"The approximate spatial location of this zone on the page."},"confidence_score":{"type":"number","description":"A score between 0 and 1 indicating how confident the model is in the extraction."}},"required":["type","content_verbatim","position"]}}},"required":["page_number","zones"]}},"document_summary":{"type":"string","description":"A brief 2-3 sentence summary of what this entire document represents."}},"required":["pages","document_summary"]}',
+            description: 'JSON schema for structured data extraction (if supported by model/prompt)',
+            placeholder: '{\n  "type": "object",\n  "properties": {\n    "invoice_number": { "type": "string" }\n  }\n}',
+            typeOptions: {
+                rows: 3,
+            },
+            hint: 'Optional: JSON schema for structured output. Default: an example schema that extracts page zones and a document summary. Clear it (or set {}) to run OCR only.',
+        },
+        {
             displayName: 'Gemini Options',
             name: 'geminiOptions',
             type: 'collection',
@@ -543,19 +511,6 @@ const versionDescription: INodeTypeDescription = {
                 },
             ],
         },
-        
-        {
-            displayName: 'Schema (Optional)',
-            name: 'schema',
-            type: 'json',
-            default: '{"type":"object","properties":{"pages":{"type":"array","description":"List of pages extracted from the document.","items":{"type":"object","properties":{"page_number":{"type":"integer","description":"The sequential number of the page."},"zones":{"type":"array","description":"List of distinct spatial zones (text blocks, tables, or images) found on this page.","items":{"type":"object","properties":{"type":{"type":"string","enum":["text_block","table","image","handwriting","header","footer"],"description":"The classification of the content in this zone."},"content_verbatim":{"type":"string","description":"For text/tables: The exact text found in this zone, preserving newlines and spacing. For images: null."},"image_description":{"type":"string","description":"For images: A detailed visual description of the image content. For text: null."},"position":{"type":"string","enum":["top_left","top_center","top_right","middle_left","center","middle_right","bottom_left","bottom_center","bottom_right"],"description":"The approximate spatial location of this zone on the page."},"confidence_score":{"type":"number","description":"A score between 0 and 1 indicating how confident the model is in the extraction."}},"required":["type","content_verbatim","position"]}}},"required":["page_number","zones"]}},"document_summary":{"type":"string","description":"A brief 2-3 sentence summary of what this entire document represents."}},"required":["pages","document_summary"]}',
-            description: 'JSON schema for structured data extraction (if supported by model/prompt)',
-            placeholder: '{\n  "type": "object",\n  "properties": {\n    "invoice_number": { "type": "string" }\n  }\n}',
-            typeOptions: {
-                rows: 5,
-            },
-            hint: 'Optional: JSON schema for structured output. Default: an example schema that extracts page zones and a document summary. Clear it (or set {}) to run OCR only.',
-        },
         {
             displayName: 'Attachment Filter',
             name: 'attachmentFilter',
@@ -563,7 +518,7 @@ const versionDescription: INodeTypeDescription = {
             placeholder: 'Add filter',
             default: {},
             description: 'Filter which attachments to process based on file extension',
-            hint: 'Optional: Define rules to include or exclude attachments based on their file extension.',
+            hint: 'Optional: Include or exclude attachments by file extension. Default: no filter, every file is processed. The filter only applies once Extensions is added.',
             options: [
                 {
                     displayName: 'Filter Mode',
@@ -588,16 +543,6 @@ const versionDescription: INodeTypeDescription = {
             ],
         },
 
-        // --- Behavior ---
-        {
-            displayName: 'Input Binary Field',
-            name: 'binaryPropertyName',
-            type: 'string',
-            default: 'data',
-            required: true,
-            description: 'Name of the binary property in the input item containing the file data',
-            hint: 'Specify the field name holding the file data in the input item. Default: data. Required field.',
-        },
 
         // --- Optional Settings Grouped ---
         {
@@ -635,9 +580,8 @@ const versionDescription: INodeTypeDescription = {
                         loadOptionsDependsOn: ['schema'],
                     },
                 },
-                { displayName: 'Image Density (DPI)', name: 'imageDensity', type: 'number', default: 150, description: 'Target DPI for image conversion during OCR', typeOptions: { minValue: 70 }, hint: 'Resolution for image conversion during OCR. Min: 70. The library caps it at 150, so higher values have no effect. Default: 150.' },
                 { displayName: 'Image Format', name: 'imageFormat', type: 'options', options: [ { name: 'PNG', value: 'png' }, { name: 'JPEG', value: 'jpeg' } ], default: 'png', description: 'Image format used for intermediate images during OCR', hint: 'Choose PNG or JPEG for intermediate image conversion. Default: PNG.' },
-                { displayName: 'Image Height (Pixels)', name: 'imageHeight', type: 'number', default: 2048, description: 'Target height for image resizing (preserves aspect ratio)', hint: 'Resize images to this height before processing. Default: 2048.' },
+                { displayName: 'Image Height (Pixels)', name: 'imageHeight', type: 'number', default: 2048, typeOptions: { minValue: 1 }, description: 'Pixel height each page is rendered at before it is sent to the model (aspect ratio preserved)', hint: 'The resolution setting for page images: higher means more detail but larger images and more tokens. Must be a positive whole number. Default: 2048.' },
                 { displayName: 'Maintain Format', name: 'maintainFormat', type: 'boolean', default: false, description: 'Whether to attempt to preserve original document formatting in markdown output', hint: 'Try to keep original formatting in the Markdown output. Default: false.' },
                 { displayName: 'Max Image Size (MB)', name: 'maxImageSize', type: 'number', default: 15, description: 'Maximum size for individual images sent to the LLM', hint: 'Limit the size of images sent to the AI model. Default: 15 MB.' },
                 { displayName: 'Max Retries', name: 'maxRetries', type: 'number', default: 1, description: 'Maximum number of retries for failed LLM calls within Limescape Docs', hint: 'How many times to retry failed AI calls. Default: 1.' },
@@ -674,12 +618,7 @@ const versionDescription: INodeTypeDescription = {
             description: 'Optional parameters to control the main LLM generation',
             hint: 'Fine-tune the behavior of the main AI model.',
             options: [
-                { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes frequent tokens', hint: 'Discourage repeating the same tokens. Not available for AWS Bedrock. Default: 0.', displayOptions: { hide: { '/modelProvider': [LimescapeModelProvider.BEDROCK] } } },
-                { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false, description: 'Whether to return log probabilities (if supported)', hint: 'Include token probabilities in the output. OpenAI, Azure and Azure AI Foundry only. Default: false.', displayOptions: { show: { '/modelProvider': LOGPROBS_PROVIDERS } } },
                 { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 16000, description: 'Max tokens for the LLM response', hint: 'Maximum length of the AI response. Check the model card for the supported maximum: the API rejects values the model does not support. Increase it if responses are cut off. Default: 16000.' },
-                { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes new tokens', hint: 'Discourage introducing new topics. Not available for AWS Bedrock. Default: 0.', displayOptions: { hide: { '/modelProvider': [LimescapeModelProvider.BEDROCK] } } },
-                { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, description: 'Controls randomness (0=deterministic)', hint: 'Higher values mean more creativity, lower means more focused. Some models ignore it. Default: 0.1.', displayOptions: { hide: { '/modelProvider': GOOGLE_PROVIDERS } } },
-                { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, description: 'Nucleus sampling parameter', hint: 'Alternative to temperature for controlling randomness. Some models ignore it. Default: 1.', displayOptions: { hide: { '/modelProvider': GOOGLE_PROVIDERS } } },
             ],
         },
         {
@@ -691,12 +630,7 @@ const versionDescription: INodeTypeDescription = {
             description: 'Optional parameters to control the extraction LLM generation, overriding main LLM parameters',
             hint: 'Fine-tune the behavior of the extraction AI model, overriding main LLM parameters.',
             options: [
-                { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, hint: 'Extraction specific: Discourage repeating tokens. Not available for AWS Bedrock. Default: 0.', displayOptions: { hide: { '/extractionProvider': [LimescapeModelProvider.BEDROCK] } } },
-                { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false, hint: 'Extraction specific: Include token probabilities. OpenAI, Azure and Azure AI Foundry only. Default: false.', displayOptions: { show: { '/extractionProvider': LOGPROBS_PROVIDERS } } },
                 { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 16000, hint: 'Extraction specific: Max response length. Check the model card for the supported maximum: the API rejects values the model does not support. Default: 16000.' },
-                { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, hint: 'Extraction specific: Discourage new topics. Not available for AWS Bedrock. Default: 0.', displayOptions: { hide: { '/extractionProvider': [LimescapeModelProvider.BEDROCK] } } },
-                { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, hint: 'Extraction specific: Controls randomness. Some models ignore it. Default: 0.1.', displayOptions: { hide: { '/extractionProvider': GOOGLE_PROVIDERS } } },
-                { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, hint: 'Extraction specific: Nucleus sampling. Some models ignore it. Default: 1.', displayOptions: { hide: { '/extractionProvider': GOOGLE_PROVIDERS } } },
             ],
         },
     ],
@@ -757,13 +691,13 @@ export class LimescapeDocsV2 implements INodeType {
 
             async getModelsForProvider(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
                 const provider = this.getCurrentNodeParameter('modelProvider') as string;
-                return modelsForProvider(provider);
+                return modelOptionsForProvider(provider);
             },
 
             async getExtractionModelsForProvider(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
                 const extractionProvider = this.getCurrentNodeParameter('extractionOptions.extractionModelProvider') as string | undefined;
                 const provider = extractionProvider || (this.getCurrentNodeParameter('modelProvider') as string);
-                return modelsForProvider(provider);
+                return modelOptionsForProvider(provider);
             },
         },
     };
@@ -813,21 +747,6 @@ export class LimescapeDocsV2 implements INodeType {
         const globalExtractionLlmParameters = this.getNodeParameter('extractionLlmParameters', 0, {}) as IDataObject;
         const globalGeminiOptions = this.getNodeParameter('geminiOptions', 0, {}) as IDataObject;
 
-        // --- Parameter Validation Safeguards ---
-        // Validate imageDensity in Processing Options
-        if (globalProcessingOptions && globalProcessingOptions.imageDensity !== undefined) {
-            const density = Number(globalProcessingOptions.imageDensity);
-            if (
-                globalProcessingOptions.imageDensity === null ||
-                globalProcessingOptions.imageDensity === '' ||
-                isNaN(density) ||
-                density === 0 ||
-                density < 70
-            ) {
-                throw new NodeOperationError(this.getNode(), 'Processing Options: Image Density (DPI) must be a number and at least 70.', { itemIndex: -1 });
-            }
-        }
-
         // --- Get Credentials ---
         const credentials = await this.getCredentials('limescapeDocsV2Api') as IDataObject;
 
@@ -844,8 +763,8 @@ export class LimescapeDocsV2 implements INodeType {
 
             // Build LLM params objects once
             const effectiveExtractionProvider = extractionProvider || globalModelProvider;
-            const globalLlmParams = buildLLMParams(globalLlmParameters, globalModelProvider);
-            const globalExtractionLlmParams = buildLLMParams(globalExtractionLlmParameters, effectiveExtractionProvider);
+            const globalLlmParams = buildLLMParams(globalLlmParameters);
+            const globalExtractionLlmParams = buildLLMParams(globalExtractionLlmParameters);
             const usesGemini =
                 GOOGLE_PROVIDERS.includes(globalModelProvider) || GOOGLE_PROVIDERS.includes(effectiveExtractionProvider);
 
@@ -877,13 +796,15 @@ export class LimescapeDocsV2 implements INodeType {
                 const item = items[i];
 
                 // --- Attachment filter logic ---
-                if (item.binary) {
-                    const binaryData = item.binary[binaryPropertyName] as IBinaryData;
-                    currentFilename = binaryData.fileName || currentFilename;
+                // Items without this binary field fall through to the per-item "Missing binary data" error
+                const filterBinaryData = item.binary?.[binaryPropertyName] as IBinaryData | undefined;
+                if (filterBinaryData) {
+                    currentFilename = filterBinaryData.fileName || currentFilename;
                     currentExtension = path.extname(currentFilename).substring(1).toLowerCase();
-                    const shouldProcess = filterMode === 'include'
+                    // No extensions listed means no filter: every file is processed
+                    const shouldProcess = extensions.length === 0 || (filterMode === 'include'
                         ? extensions.includes(currentExtension)
-                        : !extensions.includes(currentExtension);
+                        : !extensions.includes(currentExtension));
                     if (!shouldProcess) {
                         aggregatedResults.processingIssues.push(`Skipped Item ${i} (${currentFilename}): Filtered out by attachment filter.`);
                         continue;

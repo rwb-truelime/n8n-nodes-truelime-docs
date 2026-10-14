@@ -42,7 +42,7 @@ tarball built from a sibling repo:
 ```
 
 - The node's TypeScript imports (`limescapeDocs`, `LimescapeDocsArgs`, `ModelCredentials`,
-  `LLMParams`, `ModelProvider`, `ModelOptions`, `ErrorMode`, `GeminiThinkingLevel`, `GeminiMediaResolution`) all come from this library. Its types define
+  `LLMParams`, `ModelProvider`, `ModelOptions`, `getModelsForProvider`, `ErrorMode`, `GeminiThinkingLevel`, `GeminiMediaResolution`) all come from this library. Its types define
   the contract the node builds against.
 - The tarball is packed in the sibling repo `limescape-ai-limescape-docs` and copied into this
   repo's root (gitignored via `*.tgz`; `Dockerfile-n8n-v2` `COPY`s it from here). To pick up library
@@ -85,8 +85,9 @@ A version bump touches several places that must agree:
 ### Execution flow (`LimescapeDocsV2.execute`)
 
 1. Read global parameters once (provider, model, schema, the four collection params).
-2. Validate safeguards: `imageDensity` ≥ 70. `maxTokens` has no node-side range: limits differ
-   per model, so the provider validates it.
+2. No node-side range checks: `maxTokens` limits differ per model (the provider validates), and the
+   library validates `imageHeight` (positive integer). There is no `imageDensity`: page images are
+   rendered at `imageHeight` pixels.
 3. Map n8n credentials → library `ModelCredentials` via `mapCredentialsForProvider`
    (also does per-provider required-field validation).
 4. Loop over input items. Per item: apply the **attachment filter** (include/exclude by
@@ -101,17 +102,17 @@ A version bump touches several places that must agree:
 
 ### Helper functions (top of the V2 file)
 
-`parsePages` (parses `"1,3-5"` ranges), `buildLLMParams` (collection → `LLMParams`,
-skipping empty values and dropping keys the library rejects for the provider: `logprobs` outside
-OpenAI/Azure/AIF, penalties on Bedrock), `parseSchema` (JSON string → object, throws `NodeOperationError`
+`parsePages` (parses `"1,3-5"` ranges), `buildLLMParams` (collection → `LLMParams`;
+the library only accepts `maxTokens`, so nothing else is passed even if an old value is stored), `parseSchema` (JSON string → object, throws `NodeOperationError`
 on bad JSON), `mapCredentialsForProvider`, `buildLimescapeArgsForItem`.
 
 ### loadOptions methods
 
 - `getModelsForProvider` / `getExtractionModelsForProvider` — populate the Model dropdowns
-  per (extraction) provider from the shared `GPT_MODELS` / `GEMINI_MODELS` / `BEDROCK_MODELS`
-  presets. Values come from the library's `ModelOptions` enum, so a model the library removes
-  becomes a compile error. Models not yet in the library go through Custom Model.
+  per (extraction) provider from the library catalog via `modelOptionsForProvider`
+  (`getModelsForProvider(provider)` → `{ name: displayName, value: id }`, in catalog order). The
+  node hardcodes no model IDs, display names or provider mappings; a new library model shows up
+  after reinstalling the tarball. Models not in the catalog go through Custom Model.
 - **Azure / Azure AI Foundry have no model list**: a deployment can have any name, so the Model
   and Custom Model fields are hidden and a required `deploymentName` field is shown instead
   (passed as `azureOptions.deploymentName` and as `model`). Extraction has an optional
@@ -150,8 +151,8 @@ version (override with `N8N_VERSION`). Requires `az acr login --name tlteamai` /
 
 1. Add `INodeProperties` fields for its credentials in `LimescapeDocsV2Api.credentials.ts`.
 2. Add a branch to `mapCredentialsForProvider` building the library `ModelCredentials`.
-3. Add the provider to `PROVIDER_OPTIONS` (used by `modelProvider` and `extractionModelProvider`),
-   and add its model presets to `modelsForProvider`.
+3. Add the provider to `PROVIDER_OPTIONS` (used by `modelProvider` and `extractionModelProvider`).
+   Its models come from the library catalog; nothing to add in the node.
 4. Wire any provider-specific args through `buildLimescapeArgsForItem` if needed.
 
 ## Conventions
@@ -161,8 +162,8 @@ version (override with `N8N_VERSION`). Requires `az acr login --name tlteamai` /
 - User-facing errors use `NodeOperationError` (with `itemIndex`), never bare throws.
 - Every node property carries both a `description` and a `hint`.
 - The current branch `n8n-upgrade-to-v2` targets `n8n-workflow` v2 peer deps (`^2.15.0`).
-- Google providers (`GOOGLE`, `GEMINI_ENTERPRISE`): the library strips temperature/topP/topK,
-  so the node hides them; Gemini Options (thinking level, media resolution) are shown per
+- LLM parameters are only `maxTokens` (the library rejects sampling params: every supported model
+  runs with reasoning on). Gemini Options (thinking level, media resolution) are shown per Google
   provider, never per model-name prefix.
 - Hints never make claims about specific models or regions (availability, supported values):
   those change without a node release. Point users to the model card instead.
