@@ -26,6 +26,8 @@ import {
 } from 'limescape-docs';
 
 const GOOGLE_PROVIDERS: string[] = [LimescapeModelProvider.GOOGLE, LimescapeModelProvider.GEMINI_ENTERPRISE];
+// Azure providers address a deployment (any name the user chose), not a model ID.
+const AZURE_PROVIDERS: string[] = [LimescapeModelProvider.AZURE, LimescapeModelProvider.AZURE_AIF];
 const LOGPROBS_PROVIDERS: string[] = [
     LimescapeModelProvider.OPENAI,
     LimescapeModelProvider.AZURE,
@@ -64,13 +66,7 @@ const BEDROCK_MODELS: INodePropertyOptions[] = [
 ];
 
 const modelsForProvider = (provider: string | undefined): INodePropertyOptions[] => {
-    if (
-        provider === LimescapeModelProvider.OPENAI ||
-        provider === LimescapeModelProvider.AZURE ||
-        provider === LimescapeModelProvider.AZURE_AIF
-    ) {
-        return GPT_MODELS;
-    }
+    if (provider === LimescapeModelProvider.OPENAI) return GPT_MODELS;
     if (provider && GOOGLE_PROVIDERS.includes(provider)) return GEMINI_MODELS;
     if (provider === LimescapeModelProvider.BEDROCK) return BEDROCK_MODELS;
     return [];
@@ -284,6 +280,9 @@ interface BuildArgsInput {
     filePath: string;
     modelProvider: LimescapeModelProvider;
     model: string;
+    deploymentName?: string;
+    extractionDeploymentName?: string;
+    extractionIsAzure: boolean;
     schema?: Record<string, unknown>;
     processingOptions: IDataObject;
     extractionOptions: IDataObject;
@@ -298,6 +297,9 @@ const buildLimescapeArgsForItem = (input: BuildArgsInput): LimescapeDocsArgs => 
         filePath,
         modelProvider,
         model,
+        deploymentName,
+        extractionDeploymentName,
+        extractionIsAzure,
         schema,
         processingOptions,
         extractionOptions,
@@ -313,6 +315,10 @@ const buildLimescapeArgsForItem = (input: BuildArgsInput): LimescapeDocsArgs => 
         model,
         credentials: baseCredentials,
     } as LimescapeDocsArgs;
+
+    if (deploymentName) {
+        args.azureOptions = { deploymentName };
+    }
 
     if (schema) {
         args.schema = schema;
@@ -354,9 +360,15 @@ const buildLimescapeArgsForItem = (input: BuildArgsInput): LimescapeDocsArgs => 
     if (eo.extractionModelProvider) {
         args.extractionModelProvider = eo.extractionModelProvider as LimescapeModelProvider;
     }
-    const extractionModel = (eo.customExtractionModel as string) || (eo.extractionModel as string);
-    if (extractionModel) {
-        args.extractionModel = extractionModel;
+    if (extractionDeploymentName) {
+        args.extractionAzureOptions = { deploymentName: extractionDeploymentName };
+        args.extractionModel = extractionDeploymentName;
+    } else if (!extractionIsAzure) {
+        // Azure extraction without its own deployment falls back to the main deployment in the library.
+        const extractionModel = (eo.customExtractionModel as string) || (eo.extractionModel as string);
+        if (extractionModel) {
+            args.extractionModel = extractionModel;
+        }
     }
     if (eo.extractionPrompt) {
         args.extractionPrompt = eo.extractionPrompt as string;
@@ -453,6 +465,11 @@ const versionDescription: INodeTypeDescription = {
             default: ModelOptions.GOOGLE_GEMINI_3_8_FLASH,
             description: 'Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>',
             hint: 'Filtered by provider. Can be overridden by Custom Model. Default: Gemini 3.8 Flash.',
+            displayOptions: {
+                hide: {
+                    modelProvider: AZURE_PROVIDERS,
+                },
+            },
         },
         {
             displayName: 'Custom Model',
@@ -460,8 +477,28 @@ const versionDescription: INodeTypeDescription = {
             type: 'string',
             default: '',
             description: 'Overrides the Model selection. Use the exact model identifier required by the provider/library.',
-            placeholder: 'e.g., gpt-6-sol or specific Azure deployment ID',
+            placeholder: 'e.g., gpt-6-sol',
             hint: 'Optional: Enter a specific model ID to override the Model selection. Leave empty to use the selected Model.',
+            displayOptions: {
+                hide: {
+                    modelProvider: AZURE_PROVIDERS,
+                },
+            },
+        },
+        {
+            displayName: 'Deployment Name',
+            name: 'deploymentName',
+            type: 'string',
+            default: '',
+            required: true,
+            description: 'Name of your model deployment in Azure OpenAI or Azure AI Foundry',
+            placeholder: 'e.g., my-gpt-deployment',
+            hint: 'The deployment name exactly as shown in the Azure portal or Azure AI Foundry. Required for Azure providers.',
+            displayOptions: {
+                show: {
+                    modelProvider: AZURE_PROVIDERS,
+                },
+            },
         },
         {
             displayName: 'Gemini Options',
@@ -621,9 +658,10 @@ const versionDescription: INodeTypeDescription = {
             description: 'Optional settings specific to the extraction model/prompt, overriding main settings if provided',
             hint: 'Override model, provider, or prompt specifically for the extraction step.',
             options: [
+                { displayName: 'Custom Extraction Model', name: 'customExtractionModel', type: 'string', default: '', description: 'Override custom model for extraction step', hint: 'Optional: Enter a specific model ID to override the Extraction Model. Default: empty.', displayOptions: { hide: { '/extractionProvider': AZURE_PROVIDERS } } },
+                { displayName: 'Extraction Deployment Name', name: 'extractionDeploymentName', type: 'string', default: '', placeholder: 'e.g., my-gpt-deployment', description: 'Name of the Azure OpenAI or Azure AI Foundry deployment for the extraction step', hint: 'Deployment name exactly as shown in the Azure portal or Azure AI Foundry. Default: empty (use the main Deployment Name). Required when only the extraction provider is Azure.', displayOptions: { show: { '/extractionProvider': AZURE_PROVIDERS } } },
+                { displayName: 'Extraction Model Name or ID', name: 'extractionModel', type: 'options', typeOptions: { loadOptionsMethod: 'getExtractionModelsForProvider', loadOptionsDependsOn: ['extractionOptions.extractionModelProvider', 'modelProvider'] }, default: '', description: 'Override model for extraction step. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.', hint: 'Optional: Filtered by the extraction provider (or the main provider). Default: empty (use main model).', displayOptions: { hide: { '/extractionProvider': AZURE_PROVIDERS } } },
                 { displayName: 'Extraction Model Provider', name: 'extractionModelProvider', type: 'options', options: PROVIDER_OPTIONS, default: '', description: 'Override provider for extraction step', hint: 'Optional: Select a different AI provider just for extraction. Default: empty (use main provider).' },
-                { displayName: 'Extraction Model Name or ID', name: 'extractionModel', type: 'options', typeOptions: { loadOptionsMethod: 'getExtractionModelsForProvider', loadOptionsDependsOn: ['extractionOptions.extractionModelProvider', 'modelProvider'] }, default: '', description: 'Override model for extraction step. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.', hint: 'Optional: Filtered by the extraction provider (or the main provider). Default: empty (use main model).' },
-                { displayName: 'Custom Extraction Model', name: 'customExtractionModel', type: 'string', default: '', description: 'Override custom model for extraction step', hint: 'Optional: Enter a specific model ID to override the Extraction Model. Default: empty.' },
                 { displayName: 'Extraction Prompt', name: 'extractionPrompt', type: 'string', default: '', typeOptions: { rows: 4 }, description: 'Specific prompt for the extraction step', hint: 'Optional: Provide a prompt specifically for the extraction step. Default: empty (use main prompt or schema).' },
             ],
         },
@@ -767,6 +805,7 @@ export class LimescapeDocsV2 implements INodeType {
         const globalModelProvider = this.getNodeParameter('modelProvider', 0) as LimescapeModelProvider;
         const globalModel = this.getNodeParameter('model', 0) as string;
         const globalCustomModel = this.getNodeParameter('customModel', 0, '') as string;
+        const globalDeploymentName = (this.getNodeParameter('deploymentName', 0, '') as string).trim();
         const globalSchemaRaw = this.getNodeParameter('schema', 0, '') as string | object;
         const globalProcessingOptions = this.getNodeParameter('processingOptions', 0, {}) as IDataObject;
         const globalExtractionOptions = this.getNodeParameter('extractionOptions', 0, {}) as IDataObject;
@@ -809,6 +848,19 @@ export class LimescapeDocsV2 implements INodeType {
             const globalExtractionLlmParams = buildLLMParams(globalExtractionLlmParameters, effectiveExtractionProvider);
             const usesGemini =
                 GOOGLE_PROVIDERS.includes(globalModelProvider) || GOOGLE_PROVIDERS.includes(effectiveExtractionProvider);
+
+            // Azure providers address a deployment instead of a model ID
+            const mainIsAzure = AZURE_PROVIDERS.includes(globalModelProvider);
+            const extractionIsAzure = AZURE_PROVIDERS.includes(effectiveExtractionProvider);
+            if (mainIsAzure && !globalDeploymentName) {
+                throw new NodeOperationError(this.getNode(), 'Deployment Name is required when using Azure or Azure AI Foundry as the provider.', { itemIndex: -1 });
+            }
+            const extractionDeploymentName = extractionIsAzure
+                ? ((globalExtractionOptions.extractionDeploymentName as string | undefined) || '').trim()
+                : '';
+            if (extractionIsAzure && !mainIsAzure && !extractionDeploymentName) {
+                throw new NodeOperationError(this.getNode(), 'Extraction Specifics: Extraction Deployment Name is required when the extraction provider is Azure or Azure AI Foundry.', { itemIndex: -1 });
+            }
 
             // --- Process Each Item ---
             // Get attachment filter settings
@@ -858,11 +910,14 @@ export class LimescapeDocsV2 implements INodeType {
                     fs.writeFileSync(tempFilePath, fileBuffer);
 
                     // --- 3. Prepare LimescapeDocs arguments for this item ---
-                    const effectiveModel = globalCustomModel || globalModel;
+                    const effectiveModel = mainIsAzure ? globalDeploymentName : globalCustomModel || globalModel;
                     const limescapeArgs = buildLimescapeArgsForItem({
                         filePath: tempFilePath,
                         modelProvider: globalModelProvider,
                         model: effectiveModel,
+                        deploymentName: mainIsAzure ? globalDeploymentName : undefined,
+                        extractionDeploymentName: extractionDeploymentName || undefined,
+                        extractionIsAzure,
                         schema: globalSchema,
                         processingOptions: globalProcessingOptions,
                         extractionOptions: globalExtractionOptions,

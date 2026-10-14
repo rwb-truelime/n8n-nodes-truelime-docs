@@ -112,6 +112,10 @@ on bad JSON), `mapCredentialsForProvider`, `buildLimescapeArgsForItem`.
   per (extraction) provider from the shared `GPT_MODELS` / `GEMINI_MODELS` / `BEDROCK_MODELS`
   presets. Values come from the library's `ModelOptions` enum, so a model the library removes
   becomes a compile error. Models not yet in the library go through Custom Model.
+- **Azure / Azure AI Foundry have no model list**: a deployment can have any name, so the Model
+  and Custom Model fields are hidden and a required `deploymentName` field is shown instead
+  (passed as `azureOptions.deploymentName` and as `model`). Extraction has an optional
+  `extractionDeploymentName` (→ `extractionAzureOptions`), required when only extraction is Azure.
 - `getSchemaPropertyKeys` — parses the Schema JSON to offer top-level keys for the
   "Extract Per Page Keys" multiOptions field.
 

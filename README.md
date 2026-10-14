@@ -55,6 +55,7 @@ Before using the node, configure credentials for your AI provider(s) in n8n:
 | **Model Provider** | Select your AI provider (default: Google Gemini Enterprise) |
 | **Model** | Choose from preset models or use custom (default: Gemini 3.8 Flash) |
 | **Custom Model** | Override with a specific model ID |
+| **Deployment Name** | Azure and Azure AI Foundry only (replaces Model): your deployment name as shown in the Azure portal / AI Foundry |
 | **Gemini Options** | Thinking Level and Media Resolution, shown when a Google provider is used |
 | **Schema** | JSON schema for structured data extraction |
 | **Input Binary Field** | Name of the binary property containing the file (default: \`data\`) |
@@ -87,6 +88,7 @@ Override model/provider specifically for the extraction step:
 |--------|-------------|
 | Extraction Model Provider | Different provider for extraction |
 | Extraction Model | Different model for extraction (default: empty, uses the main model) |
+| Extraction Deployment Name | Azure extraction only: deployment for the extraction step (default: the main Deployment Name) |
 | Custom Extraction Model | Custom model ID for extraction |
 | Extraction Prompt | Specific prompt for extraction step |
 
