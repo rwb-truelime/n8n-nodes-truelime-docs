@@ -61,8 +61,6 @@ const BEDROCK_MODELS: INodePropertyOptions[] = [
     { name: 'Claude Fable 5.1 (Global)', value: ModelOptions.BEDROCK_CLAUDE_FABLE_5_1_GLOBAL },
     { name: 'Claude Sonnet 5 (EU)', value: ModelOptions.BEDROCK_CLAUDE_SONNET_5_EU },
     { name: 'Claude Sonnet 5 (Global)', value: ModelOptions.BEDROCK_CLAUDE_SONNET_5_GLOBAL },
-    { name: 'Claude Haiku 4.5 (EU)', value: ModelOptions.BEDROCK_CLAUDE_HAIKU_4_5_EU },
-    { name: 'Claude Haiku 4.5 (Global)', value: ModelOptions.BEDROCK_CLAUDE_HAIKU_4_5_GLOBAL },
 ];
 
 const modelsForProvider = (provider: string | undefined): INodePropertyOptions[] => {
