@@ -70,8 +70,6 @@ services:
       N8N_COMMUNITY_PACKAGES_ENABLED: "true"
       N8N_UNVERIFIED_PACKAGES_ENABLED: "true"
       N8N_REINSTALL_MISSING_PACKAGES: "false"
-    volumes:
-      - n8n_data:/home/node/.n8n
     depends_on:
       postgres:
         condition: service_healthy
@@ -117,7 +115,6 @@ services:
       - n8n-network
 
 volumes:
-  n8n_data:
   postgres_n8n_data:
 
 networks:
