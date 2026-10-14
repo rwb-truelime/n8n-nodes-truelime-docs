@@ -32,9 +32,6 @@ const LOGPROBS_PROVIDERS: string[] = [
     LimescapeModelProvider.AZURE_AIF,
 ];
 
-const MAX_TOKENS_MIN = 1024;
-const MAX_TOKENS_MAX = 65536;
-
 const PROVIDER_OPTIONS: INodePropertyOptions[] = [
     { name: 'OpenAI', value: LimescapeModelProvider.OPENAI },
     { name: 'Azure', value: LimescapeModelProvider.AZURE },
@@ -494,7 +491,7 @@ const versionDescription: INodeTypeDescription = {
                     ],
                     default: 'medium',
                     description: 'Controls depth of reasoning for Gemini models',
-                    hint: 'Minimal is rejected by Pro models (and reportedly by Gemini 3.8 Flash). Default: Medium.',
+                    hint: 'Not every model supports every level; an unsupported level is rejected by the provider. Default: Medium.',
                 },
                 {
                     displayName: 'Media Resolution',
@@ -522,7 +519,7 @@ const versionDescription: INodeTypeDescription = {
             typeOptions: {
                 rows: 5,
             },
-            hint: 'Optional: Provide a JSON schema for structured output. Default: {}.',
+            hint: 'Optional: JSON schema for structured output. Default: an example schema that extracts page zones and a document summary. Clear it (or set {}) to run OCR only.',
         },
         {
             displayName: 'Attachment Filter',
@@ -603,9 +600,9 @@ const versionDescription: INodeTypeDescription = {
                         loadOptionsDependsOn: ['schema'],
                     },
                 },
-                { displayName: 'Image Density (DPI)', name: 'imageDensity', type: 'number', default: 150, description: 'Target DPI for image conversion during OCR', typeOptions: { minValue: 70 }, hint: 'Resolution for image conversion during OCR. Min: 70. Default: 150.' },
+                { displayName: 'Image Density (DPI)', name: 'imageDensity', type: 'number', default: 150, description: 'Target DPI for image conversion during OCR', typeOptions: { minValue: 70 }, hint: 'Resolution for image conversion during OCR. Min: 70. The library caps it at 150, so higher values have no effect. Default: 150.' },
                 { displayName: 'Image Format', name: 'imageFormat', type: 'options', options: [ { name: 'PNG', value: 'png' }, { name: 'JPEG', value: 'jpeg' } ], default: 'png', description: 'Image format used for intermediate images during OCR', hint: 'Choose PNG or JPEG for intermediate image conversion. Default: PNG.' },
-                { displayName: 'Image Height (Pixels)', name: 'imageHeight', type: 'number', default: 3072, description: 'Target height for image resizing (preserves aspect ratio)', hint: 'Resize images to this height before processing. Default: 3072.' },
+                { displayName: 'Image Height (Pixels)', name: 'imageHeight', type: 'number', default: 2048, description: 'Target height for image resizing (preserves aspect ratio)', hint: 'Resize images to this height before processing. Default: 2048.' },
                 { displayName: 'Maintain Format', name: 'maintainFormat', type: 'boolean', default: false, description: 'Whether to attempt to preserve original document formatting in markdown output', hint: 'Try to keep original formatting in the Markdown output. Default: false.' },
                 { displayName: 'Max Image Size (MB)', name: 'maxImageSize', type: 'number', default: 15, description: 'Maximum size for individual images sent to the LLM', hint: 'Limit the size of images sent to the AI model. Default: 15 MB.' },
                 { displayName: 'Max Retries', name: 'maxRetries', type: 'number', default: 1, description: 'Maximum number of retries for failed LLM calls within Limescape Docs', hint: 'How many times to retry failed AI calls. Default: 1.' },
@@ -643,10 +640,10 @@ const versionDescription: INodeTypeDescription = {
             options: [
                 { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes frequent tokens', hint: 'Discourage repeating the same tokens. Not available for AWS Bedrock. Default: 0.', displayOptions: { hide: { '/modelProvider': [LimescapeModelProvider.BEDROCK] } } },
                 { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false, description: 'Whether to return log probabilities (if supported)', hint: 'Include token probabilities in the output. OpenAI, Azure and Azure AI Foundry only. Default: false.', displayOptions: { show: { '/modelProvider': LOGPROBS_PROVIDERS } } },
-                { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 16000, description: 'Max tokens for the LLM response', typeOptions: { minValue: MAX_TOKENS_MIN, maxValue: MAX_TOKENS_MAX }, hint: `Maximum length of the AI response (${MAX_TOKENS_MIN}–${MAX_TOKENS_MAX}). Bedrock Claude Sonnet may need up to 64000. Default: 16000.` },
+                { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 16000, description: 'Max tokens for the LLM response', hint: 'Maximum length of the AI response. Check the model card for the supported maximum: the API rejects values the model does not support. Increase it if responses are cut off. Default: 16000.' },
                 { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, description: 'Penalizes new tokens', hint: 'Discourage introducing new topics. Not available for AWS Bedrock. Default: 0.', displayOptions: { hide: { '/modelProvider': [LimescapeModelProvider.BEDROCK] } } },
-                { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, description: 'Controls randomness (0=deterministic)', hint: 'Higher values mean more creativity, lower means more focused. Ignored by Bedrock Claude 5 models. Default: 0.1.', displayOptions: { hide: { '/modelProvider': GOOGLE_PROVIDERS } } },
-                { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, description: 'Nucleus sampling parameter', hint: 'Alternative to temperature for controlling randomness. Ignored by Bedrock Claude 5 models. Default: 1.', displayOptions: { hide: { '/modelProvider': GOOGLE_PROVIDERS } } },
+                { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, description: 'Controls randomness (0=deterministic)', hint: 'Higher values mean more creativity, lower means more focused. Some models ignore it. Default: 0.1.', displayOptions: { hide: { '/modelProvider': GOOGLE_PROVIDERS } } },
+                { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, description: 'Nucleus sampling parameter', hint: 'Alternative to temperature for controlling randomness. Some models ignore it. Default: 1.', displayOptions: { hide: { '/modelProvider': GOOGLE_PROVIDERS } } },
             ],
         },
         {
@@ -660,10 +657,10 @@ const versionDescription: INodeTypeDescription = {
             options: [
                 { displayName: 'Frequency Penalty', name: 'frequencyPenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, hint: 'Extraction specific: Discourage repeating tokens. Not available for AWS Bedrock. Default: 0.', displayOptions: { hide: { '/extractionProvider': [LimescapeModelProvider.BEDROCK] } } },
                 { displayName: 'Log Probabilities', name: 'logprobs', type: 'boolean', default: false, hint: 'Extraction specific: Include token probabilities. OpenAI, Azure and Azure AI Foundry only. Default: false.', displayOptions: { show: { '/extractionProvider': LOGPROBS_PROVIDERS } } },
-                { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 16000, typeOptions: { minValue: MAX_TOKENS_MIN, maxValue: MAX_TOKENS_MAX }, hint: `Extraction specific: Max response length (${MAX_TOKENS_MIN}–${MAX_TOKENS_MAX}). Default: 16000.` },
+                { displayName: 'Max Tokens', name: 'maxTokens', type: 'number', default: 16000, hint: 'Extraction specific: Max response length. Check the model card for the supported maximum: the API rejects values the model does not support. Default: 16000.' },
                 { displayName: 'Presence Penalty', name: 'presencePenalty', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0, hint: 'Extraction specific: Discourage new topics. Not available for AWS Bedrock. Default: 0.', displayOptions: { hide: { '/extractionProvider': [LimescapeModelProvider.BEDROCK] } } },
-                { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, hint: 'Extraction specific: Controls randomness. Ignored by Bedrock Claude 5 models. Default: 0.1.', displayOptions: { hide: { '/extractionProvider': GOOGLE_PROVIDERS } } },
-                { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, hint: 'Extraction specific: Nucleus sampling. Ignored by Bedrock Claude 5 models. Default: 1.', displayOptions: { hide: { '/extractionProvider': GOOGLE_PROVIDERS } } },
+                { displayName: 'Temperature', name: 'temperature', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 0.1, hint: 'Extraction specific: Controls randomness. Some models ignore it. Default: 0.1.', displayOptions: { hide: { '/extractionProvider': GOOGLE_PROVIDERS } } },
+                { displayName: 'Top P', name: 'topP', type: 'number', typeOptions: { numberStepSize: 0.1 }, default: 1, hint: 'Extraction specific: Nucleus sampling. Some models ignore it. Default: 1.', displayOptions: { hide: { '/extractionProvider': GOOGLE_PROVIDERS } } },
             ],
         },
     ],
@@ -780,17 +777,6 @@ export class LimescapeDocsV2 implements INodeType {
         const globalGeminiOptions = this.getNodeParameter('geminiOptions', 0, {}) as IDataObject;
 
         // --- Parameter Validation Safeguards ---
-        const checkMaxTokens = (params: IDataObject, context: string) => {
-            if (params && params.maxTokens !== undefined && params.maxTokens !== null) {
-                const val = Number(params.maxTokens);
-                if (isNaN(val) || val < MAX_TOKENS_MIN || val > MAX_TOKENS_MAX) {
-                    throw new NodeOperationError(this.getNode(), `${context}: Max Tokens must be between ${MAX_TOKENS_MIN} and ${MAX_TOKENS_MAX}.`, { itemIndex: -1 });
-                }
-            }
-        };
-        checkMaxTokens(globalLlmParameters, 'LLM Parameters');
-        checkMaxTokens(globalExtractionLlmParameters, 'Extraction LLM Parameters');
-
         // Validate imageDensity in Processing Options
         if (globalProcessingOptions && globalProcessingOptions.imageDensity !== undefined) {
             const density = Number(globalProcessingOptions.imageDensity);

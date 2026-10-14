@@ -85,7 +85,8 @@ A version bump touches several places that must agree:
 ### Execution flow (`LimescapeDocsV2.execute`)
 
 1. Read global parameters once (provider, model, schema, the four collection params).
-2. Validate safeguards: `maxTokens` must be 1024–65536; `imageDensity` ≥ 70.
+2. Validate safeguards: `imageDensity` ≥ 70. `maxTokens` has no node-side range: limits differ
+   per model, so the provider validates it.
 3. Map n8n credentials → library `ModelCredentials` via `mapCredentialsForProvider`
    (also does per-provider required-field validation).
 4. Loop over input items. Per item: apply the **attachment filter** (include/exclude by
@@ -159,3 +160,5 @@ version (override with `N8N_VERSION`). Requires `az acr login --name tlteamai` /
 - Google providers (`GOOGLE`, `GEMINI_ENTERPRISE`): the library strips temperature/topP/topK,
   so the node hides them; Gemini Options (thinking level, media resolution) are shown per
   provider, never per model-name prefix.
+- Hints never make claims about specific models or regions (availability, supported values):
+  those change without a node release. Point users to the model card instead.

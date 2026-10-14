@@ -122,7 +122,7 @@ export class LimescapeDocsV2Api implements ICredentialType {
             default: '',
             placeholder: 'global',
             description:
-                'Gemini Enterprise location (maps to credentials.location). Use "global" or "eu" for Gemini 3.8 Flash; Gemini 3.1 Pro requires "global".',
+                'Gemini Enterprise location (maps to credentials.location): "global", a multi-region such as "eu" or "us", or a specific region such as "europe-west4". Not every model is available in every location; check the Google Cloud documentation for the model you use.',
         },
         // AWS Bedrock
         {

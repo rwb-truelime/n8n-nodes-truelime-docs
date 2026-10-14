@@ -43,7 +43,7 @@ Before using the node, configure credentials for your AI provider(s) in n8n:
 | **Azure OpenAI** | API Key, Endpoint, (optional) API Version |
 | **Azure AI Foundry** | Base URL, API Key |
 | **Google Gemini** | API Key |
-| **Google Gemini Enterprise** | Service Account JSON, Location (`global` or `eu`; Gemini 3.1 Pro needs `global`) |
+| **Google Gemini Enterprise** | Service Account JSON, Location (`global`, a multi-region such as `eu`, or a specific region; model availability differs per location) |
 | **AWS Bedrock** | Region, plus a Bedrock API Key **or** Access Key ID + Secret Access Key (+ optional Session Token); leave all empty to use the AWS default credential chain |
 
 ## Node Configuration
@@ -73,7 +73,7 @@ Before using the node, configure credentials for your AI provider(s) in n8n:
 | Extract Per Page Keys | \`[]\` | Schema keys to extract per page (top-level only) |
 | Image Density (DPI) | \`150\` | Resolution for image conversion |
 | Image Format | \`png\` | Intermediate image format (PNG or JPEG) |
-| Image Height (Pixels) | \`3072\` | Target height for image resizing |
+| Image Height (Pixels) | \`2048\` | Target height for image resizing |
 | Maintain Format | \`false\` | Preserve original formatting in markdown |
 | Max Image Size (MB) | \`15\` | Maximum size for images sent to LLM |
 | Max Retries | \`1\` | Retries for failed LLM calls |
@@ -96,12 +96,12 @@ Fine-tune model behavior for both OCR and extraction steps. Fields the selected 
 
 | Parameter | Description |
 |-----------|-------------|
-| Temperature | Controls randomness (0.0-2.0). Not available for Google providers; ignored by Bedrock Claude 5 |
-| Top P | Nucleus sampling threshold. Not available for Google providers; ignored by Bedrock Claude 5 |
+| Temperature | Controls randomness (0.0-2.0). Not available for Google providers; some models ignore it |
+| Top P | Nucleus sampling threshold. Not available for Google providers; some models ignore it |
 | Frequency Penalty | Reduce repetition of token sequences. Not available for Bedrock |
 | Presence Penalty | Reduce repetition of topics. Not available for Bedrock |
 | Log Probabilities | Return token log probabilities. OpenAI, Azure and Azure AI Foundry only |
-| Max Tokens | Maximum tokens in response (1024–65536, default 16000) |
+| Max Tokens | Maximum tokens in response (default 16000). Check the model card for the supported maximum; the API rejects unsupported values |
 
 ## Output Structure
 
