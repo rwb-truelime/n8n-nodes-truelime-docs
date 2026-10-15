@@ -183,7 +183,7 @@ const mapCredentialsForProvider = (
     }
 
     if (provider === LimescapeModelProvider.GEMINI_ENTERPRISE) {
-        if (!credentials.geminiEnterpriseServiceAccount || !credentials.geminiEnterpriseLocation) {
+        if (!credentials.vertexServiceAccount || !credentials.vertexLocation) {
             throw new NodeOperationError(
                 node.getNode(),
                 'Gemini Enterprise Service Account and Location are required when using Google Gemini Enterprise as the provider.',
@@ -191,8 +191,8 @@ const mapCredentialsForProvider = (
             );
         }
         return {
-            serviceAccount: credentials.geminiEnterpriseServiceAccount as string,
-            location: credentials.geminiEnterpriseLocation as string,
+            serviceAccount: credentials.vertexServiceAccount as string,
+            location: credentials.vertexLocation as string,
         } as ModelCredentials;
     }
 
@@ -361,7 +361,7 @@ const versionDescription: INodeTypeDescription = {
     outputs: ['main'],
     credentials: [
         {
-            name: 'limescapeDocsV2Api',
+            name: 'limescapeDocsApi',
             required: true,
         }
     ],
@@ -748,7 +748,7 @@ export class LimescapeDocsV2 implements INodeType {
         const globalGeminiOptions = this.getNodeParameter('geminiOptions', 0, {}) as IDataObject;
 
         // --- Get Credentials ---
-        const credentials = await this.getCredentials('limescapeDocsV2Api') as IDataObject;
+        const credentials = await this.getCredentials('limescapeDocsApi') as IDataObject;
 
         try {
             const baseModelCredentials = mapCredentialsForProvider(this, globalModelProvider, credentials);

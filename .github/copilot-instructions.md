@@ -6,7 +6,7 @@ Purpose: Help AI coding agents work productively in this repository by documenti
 - Node package: Custom n8n community node providing OCR & AI-driven document extraction via `limescape-docs`.
 - Primary components:
   - `nodes/LimescapeDocs/LimescapeDocs.node.ts`: Versioned entry node (Full Versioning for majors), parameters, execution, data shaping.
-  - `credentials/LimescapeDocsApi.credentials.ts` (V1) and `credentials/LimescapeDocsV2Api.credentials.ts` (V2): Credentials schemas mapped to multiple model providers.
+  - `credentials/LimescapeDocsApi.credentials.ts`: Credentials schema (shared by all node versions) mapped to multiple model providers.
   - `icons/` + `gulpfile.js`: Icon build pipeline (`gulp build:icons`).
   - `package.json`: Scripts, n8n manifest (`n8n.credentials` and `n8n.nodes`), dependency on local tarballs in the repo root: `limescape-docs-2.0.0.tgz` (V2) and `limescape-docs-1.23.0.tgz` installed as the alias `limescape-docs-v1` (V1).
 - Key external libs: `n8n-workflow` and `limescape-docs` (local tgz). The node delegates heavy lifting to `limescape-docs`.
@@ -38,9 +38,8 @@ Purpose: Help AI coding agents work productively in this repository by documenti
   - Azure → `apiKey`, `endpoint`, optional `azureApiVersion`.
   - Azure AI Foundry → `baseUrl`, `apiKey`.
   - Google (direct) → `apiKey`.
-  - Gemini Enterprise (V2, credential `limescapeDocsV2Api`) → `serviceAccount` from `geminiEnterpriseServiceAccount`, `location` from `geminiEnterpriseLocation`.
-  - Vertex (V1, credential `limescapeDocsApi`) → `serviceAccount` from `vertexServiceAccount`, `location` from `vertexLocation`.
-- Credentials are not versioned in n8n: each node major has its own credential type (`limescapeDocsApi` for V1, `limescapeDocsV2Api` for V2).
+  - Gemini Enterprise (V2) / Vertex (V1) → `serviceAccount` from `vertexServiceAccount`, `location` from `vertexLocation` (shared stored fields).
+- Credentials are not versioned in n8n: one credential type `limescapeDocsApi` serves every node version, so only add fields; never rename or remove stored ones.
   - Bedrock → required `region`, optional `apiKey` (Bedrock API key) or `accessKeyId` + `secretAccessKey` (+ `sessionToken`); none set = AWS SDK default chain.
 - Schema input: Accepts stringified JSON. Empty (`""` or `{}`) treated as undefined. Parsing failure throws `NodeOperationError`.
 - Pages input: Use `"1,3-5"` style for `pagesToConvertAsImages` (converts to `number[]`).

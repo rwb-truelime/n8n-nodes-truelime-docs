@@ -122,18 +122,16 @@ on bad JSON), `mapCredentialsForProvider`, `buildLimescapeArgsForItem`.
 
 ### Credentials
 
-Credentials are **not versioned** in n8n, so each node major has its own credential type:
+One credential type `limescapeDocsApi` (`credentials/LimescapeDocsApi.credentials.ts`), shared
+by V1 and V2, holds fields for **all six providers**; `mapCredentialsForProvider` (one per node
+version) picks the relevant subset at runtime. Credentials are **not versioned** in n8n, so:
 
-- V1 → `limescapeDocsApi` (`credentials/LimescapeDocsApi.credentials.ts`): frozen; Google
-  Vertex fields (`vertexServiceAccount`, `vertexLocation`). Drop it together with V1.
-- V2 → `limescapeDocsV2Api` (`credentials/LimescapeDocsV2Api.credentials.ts`): Gemini
-  Enterprise (`geminiEnterpriseServiceAccount`, `geminiEnterpriseLocation`) and the Bedrock
-  API key (`bedrockApiKey`).
-
-Each holds fields for **all six providers**; `mapCredentialsForProvider` picks the relevant
-subset at runtime. Never change a stored field of a credential type an existing node version
-uses; a breaking credential change gets a new credential type with the new node major.
-Both are registered in `package.json` `n8n.credentials`.
+- **Never rename or remove a stored field**: saved credentials and V1 depend on it. Only add
+  fields (e.g. `bedrockApiKey`, used by V2 only) or change labels/descriptions.
+- Gemini Enterprise therefore uses the original `vertexServiceAccount` / `vertexLocation`
+  fields (labelled "Gemini Enterprise"); V1 maps them to `VERTEX`, V2 to `GEMINI_ENTERPRISE`.
+- A separate credential type per node major was tried and dropped: users had to re-enter every
+  key for almost no difference.
 
 ## Deployment (Docker → Azure Container Registry)
 
@@ -149,7 +147,7 @@ version (override with `N8N_VERSION`). Requires `az acr login --name tlteamai` /
 
 ## Adding a new provider
 
-1. Add `INodeProperties` fields for its credentials in `LimescapeDocsV2Api.credentials.ts`.
+1. Add `INodeProperties` fields for its credentials in `LimescapeDocsApi.credentials.ts` (additive only).
 2. Add a branch to `mapCredentialsForProvider` building the library `ModelCredentials`.
 3. Add the provider to `PROVIDER_OPTIONS` (used by `modelProvider` and `extractionModelProvider`).
    Its models come from the library catalog; nothing to add in the node.

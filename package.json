@@ -45,8 +45,7 @@
   "n8n": {
     "n8nNodesApiVersion": 1,
     "credentials": [
-      "dist/credentials/LimescapeDocsApi.credentials.js",
-      "dist/credentials/LimescapeDocsV2Api.credentials.js"
+      "dist/credentials/LimescapeDocsApi.credentials.js"
     ],
     "nodes": [
       "dist/nodes/LimescapeDocs/LimescapeDocs.node.js"

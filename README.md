@@ -34,7 +34,7 @@ pnpm add n8n-nodes-limescape-docs
 Before using the node, configure credentials for your AI provider(s) in n8n:
 
 1. Go to **Credentials** > **New Credential**
-2. Search for **Limescape Docs V2 Credentials API** (node v2). Existing v1 nodes keep using **Limescape Docs Credentials API**.
+2. Search for **Limescape Docs Credentials API** (one credential for all node versions)
 3. Fill in the credentials for your provider(s):
 
 | Provider | Required Fields |
@@ -175,8 +175,7 @@ This project follows n8n's hybrid versioning model:
 
 \`\`\`
 ├── credentials/
-│   ├── LimescapeDocsApi.credentials.ts   # V1 provider credentials
-│   └── LimescapeDocsV2Api.credentials.ts # V2 provider credentials
+│   └── LimescapeDocsApi.credentials.ts   # Provider credentials (all node versions)
 ├── nodes/
 │   └── LimescapeDocs/
 │       ├── LimescapeDocs.node.ts         # Versioned entry node

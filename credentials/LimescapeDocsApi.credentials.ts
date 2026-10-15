@@ -95,30 +95,31 @@ export class LimescapeDocsApi implements ICredentialType {
             description:
                 'Your Google GenAI (Gemini) API key (maps to credentials.apiKey when using ModelProvider.GOOGLE)',
         },
-        // Google Vertex AI
+        // Google Gemini Enterprise (formerly Vertex AI). The stored `vertex*` field names are kept
+        // because this credential is shared by all node versions (V1: VERTEX, V2: GEMINI_ENTERPRISE).
         {
-            displayName: 'Google Vertex',
+            displayName: 'Google Gemini Enterprise (formerly Vertex AI)',
             name: 'vertexNotice',
             type: 'notice',
             default: '',
         },
         {
-            displayName: 'Vertex Service Account JSON (Optional)',
+            displayName: 'Gemini Enterprise Service Account JSON (Optional)',
             name: 'vertexServiceAccount',
             type: 'string',
             typeOptions: { password: true },
             default: '',
             description:
-                'Service account JSON string for Vertex AI (maps to credentials.serviceAccount when using ModelProvider.VERTEX)',
+                'Service account JSON string for Gemini Enterprise / Vertex AI (maps to credentials.serviceAccount)',
         },
         {
-            displayName: 'Vertex Location (Optional)',
+            displayName: 'Gemini Enterprise Location (Optional)',
             name: 'vertexLocation',
             type: 'string',
             default: '',
-            placeholder: 'europe-west1',
+            placeholder: 'global',
             description:
-                'Vertex AI region / location (maps to credentials.location for Vertex AI)',
+                'Gemini Enterprise / Vertex AI location (maps to credentials.location): "global", a multi-region such as "eu" or "us", or a specific region such as "europe-west4". Not every model is available in every location; check the Google Cloud documentation for the model you use.',
         },
         // AWS Bedrock
         {
@@ -134,6 +135,15 @@ export class LimescapeDocsApi implements ICredentialType {
             default: '',
             placeholder: 'us-east-1',
             description: 'AWS region for Bedrock (maps to credentials.region)',
+        },
+        {
+            displayName: 'AWS Bedrock API Key (Optional)',
+            name: 'bedrockApiKey',
+            type: 'string',
+            typeOptions: { password: true },
+            default: '',
+            description:
+                'Bedrock API key, sent as a bearer token (maps to credentials.apiKey). Used by node version 2 and later; takes precedence over the access keys below. If neither is set, the AWS SDK default credential chain is used.',
         },
         {
             displayName: 'AWS Access Key ID (Optional)',
